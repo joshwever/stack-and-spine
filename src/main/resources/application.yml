@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: stack-and-spine
+  thymeleaf:
+    cache: false
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+stackandspine:
+  # Phase 1: "memory" | Phase 2: "firestore"
+  storage: ${STACKANDSPINE_STORAGE:memory}
+  gcp:
+    project-id: ${GOOGLE_CLOUD_PROJECT:project-f2e57f3d-860e-486f-a44}
