@@ -14,7 +14,9 @@ management:
         include: health,info
 
 stackandspine:
-  # Phase 1: "memory" | Phase 2: "firestore"
-  storage: ${STACKANDSPINE_STORAGE:memory}
+  # Toggle storage backend: "firestore" (Google Cloud Firestore) or "memory" (local in-memory)
+  storage: ${STACKANDSPINE_STORAGE:firestore}
   gcp:
     project-id: ${GOOGLE_CLOUD_PROJECT:project-f2e57f3d-860e-486f-a44}
+    database-id: ${STACKANDSPINE_FIRESTORE_DATABASE:(default)}
+    collection: ${STACKANDSPINE_FIRESTORE_COLLECTION:media_items}
