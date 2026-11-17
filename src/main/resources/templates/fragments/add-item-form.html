@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+    <aside th:fragment="addItemForm"
+           id="add-item-aside"
+           class="lg:col-span-1 group-data-[expanded=true]/layout:lg:row-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 h-fit">
+        <div class="flex items-center justify-between gap-3">
+            <div>
+                <h2 class="text-sm font-semibold text-white leading-tight">Add to Collection</h2>
+                <p class="text-xs text-slate-400 mt-0.5">Add a Book, Blu-Ray, or DVD.</p>
+            </div>
+            <button type="button"
+                    id="toggle-add-form-btn"
+                    aria-expanded="false"
+                    aria-controls="add-item-form"
+                    title="Expand Add to Collection form"
+                    onclick="toggleAddItemForm()"
+                    class="h-9 w-9 shrink-0 rounded-lg bg-indigo-600/20 hover:bg-indigo-600 border border-indigo-500/40 text-indigo-300 hover:text-white flex items-center justify-center text-xl font-semibold leading-none transition focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <span id="toggle-add-form-icon" class="inline-block transition-transform duration-200">+</span>
+            </button>
+        </div>
+
+        <form id="add-item-form" method="post" action="/items" class="hidden mt-4 pt-4 border-t border-slate-800 space-y-3.5 text-sm">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Media Type *</label>
+                <select name="mediaType" required
+                        class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100">
+                    <option th:each="mt : ${mediaTypes}" th:value="${mt.name()}" th:text="${mt.displayName}">Book</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Title *</label>
+                <input type="text" name="title" required placeholder="e.g., Neuromancer or The Matrix"
+                       class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100">
+            </div>
+
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Author / Director *</label>
+                <input type="text" name="creator" required placeholder="e.g., William Gibson"
+                       class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Release Year</label>
+                    <input type="number" name="releaseYear" placeholder="1984"
+                           class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Genre</label>
+                    <input type="text" name="genre" placeholder="Sci-Fi"
+                           class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">ISBN / UPC Code</label>
+                    <input type="text" name="identifierCode" placeholder="978-0441569595"
+                           class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100 font-mono text-xs">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1">Shelf Location</label>
+                    <input type="text" name="shelfLocation" placeholder="Study - B2"
+                           class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100">
+                </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-800">
+                <p class="text-xs text-slate-400 mb-2">Custom Attributes (Pages, Resolution, Region, etc.)</p>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="text" name="attrKey1" placeholder="e.g., Resolution"
+                           class="rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-slate-100">
+                    <input type="text" name="attrVal1" placeholder="e.g., 4K UHD"
+                           class="rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-slate-100">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" name="attrKey2" placeholder="e.g., Audio / Pages"
+                           class="rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-slate-100">
+                    <input type="text" name="attrVal2" placeholder="e.g., Dolby Atmos"
+                           class="rounded-lg bg-slate-950 border border-slate-800 px-2.5 py-1.5 text-xs text-slate-100">
+                </div>
+            </div>
+
+            <button type="submit"
+                    class="w-full mt-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 text-sm shadow-lg shadow-indigo-600/25 transition">
+                Save Media Item
+            </button>
+        </form>
+    </aside>
+</body>
+</html>
+

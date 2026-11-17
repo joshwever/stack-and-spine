@@ -36,21 +36,16 @@ public class CatalogController {
             Model model) {
 
         List<MediaItem> items = mediaRepository.findByTypeAndQuery(mediaType, query);
-        List<MediaItem> allItems = mediaRepository.findAll();
 
         model.addAttribute("items", items);
         model.addAttribute("selectedType", mediaType);
         model.addAttribute("query", query == null ? "" : query);
         model.addAttribute("mediaTypes", MediaType.values());
-        model.addAttribute("storageBackend", mediaRepository.storageBackendName());
-        model.addAttribute("totalCount", allItems.size());
-        model.addAttribute("bookCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.BOOK).count());
-        model.addAttribute("bluRayCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.BLU_RAY).count());
-        model.addAttribute("dvdCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.DVD).count());
         model.addAttribute("newItem", new MediaItem());
+        populateStats(model);
 
         if ("true".equalsIgnoreCase(hxRequest)) {
-            return "index :: #catalog-grid";
+            return "fragments/catalog-grid :: grid";
         }
         return "index";
     }
@@ -82,10 +77,10 @@ public class CatalogController {
     }
 
     @DeleteMapping("/items/{id}")
-    @ResponseBody
-    public String deleteItem(@PathVariable("id") String id) {
+    public String deleteItem(@PathVariable("id") String id, Model model) {
         mediaRepository.deleteById(id);
-        return "";
+        populateStats(model);
+        return "fragments/header :: stats(true)";
     }
 
     @GetMapping("/api/items")
@@ -94,5 +89,14 @@ public class CatalogController {
             @RequestParam(name = "type", required = false) MediaType mediaType,
             @RequestParam(name = "q", required = false) String query) {
         return mediaRepository.findByTypeAndQuery(mediaType, query);
+    }
+
+    private void populateStats(Model model) {
+        List<MediaItem> allItems = mediaRepository.findAll();
+        model.addAttribute("storageBackend", mediaRepository.storageBackendName());
+        model.addAttribute("totalCount", allItems.size());
+        model.addAttribute("bookCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.BOOK).count());
+        model.addAttribute("bluRayCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.BLU_RAY).count());
+        model.addAttribute("dvdCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.DVD).count());
     }
 }

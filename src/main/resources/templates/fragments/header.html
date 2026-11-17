@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+    <header th:fragment="header" class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="h-10 w-10 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-indigo-600/30">
+                    S&amp;S
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Stack &amp; Spine</h1>
+                    <p class="text-xs text-slate-400">
+                        Storage Backend:
+                        <span class="text-emerald-400 font-mono" th:text="${storageBackend}">In-Memory</span>
+                    </p>
+                </div>
+            </div>
+
+            <div th:replace="~{fragments/header :: stats(false)}"></div>
+        </div>
+    </header>
+
+    <!-- Stats Pills (supports out-of-band HTMX swap when oob=true) -->
+    <div th:fragment="stats(oob)"
+         id="stats-pills"
+         th:attr="hx-swap-oob=${oob ? 'true' : null}"
+         class="flex flex-wrap items-center gap-2 text-xs">
+        <span class="px-3 py-1.5 rounded-full bg-slate-800 text-slate-300">
+            Total: <strong th:text="${totalCount}">0</strong>
+        </span>
+        <span class="px-3 py-1.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-800/60">
+            Books: <strong th:text="${bookCount}">0</strong>
+        </span>
+        <span class="px-3 py-1.5 rounded-full bg-sky-950 text-sky-300 border border-sky-800/60">
+            Blu-Ray: <strong th:text="${bluRayCount}">0</strong>
+        </span>
+        <span class="px-3 py-1.5 rounded-full bg-amber-950 text-amber-300 border border-amber-800/60">
+            DVD: <strong th:text="${dvdCount}">0</strong>
+        </span>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+    <form th:fragment="searchBar"
+          method="get" action="/"
+          hx-get="/"
+          hx-target="#catalog-grid"
+          hx-swap="outerHTML"
+          hx-push-url="true"
+          hx-trigger="submit, keyup changed delay:300ms from:input[name='q'], change from:select[name='type']"
+          class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row gap-3">
+        <div class="flex-1">
+            <label for="q" class="sr-only">Search</label>
+            <input type="search" id="q" name="q" th:value="${query}"
+                   placeholder="Search title, author/director, ISBN/UPC, or genre..."
+                   class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3.5 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+            <label for="type" class="sr-only">Media Type</label>
+            <select id="type" name="type"
+                    class="w-full sm:w-44 rounded-lg bg-slate-950 border border-slate-800 px-3.5 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                <option value="">All Media Types</option>
+                <option th:each="mt : ${mediaTypes}"
+                        th:value="${mt.name()}"
+                        th:text="${mt.displayName}"
+                        th:selected="${mt == selectedType}">Book</option>
+            </select>
+        </div>
+    </form>
+</body>
+</html>
+
