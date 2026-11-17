@@ -18,9 +18,13 @@ class StackAndSpineApplicationTests {
     private MockMvc mockMvc;
 
     @Test
-    void contextLoadsAndReturnsSeededCatalog() throws Exception {
+    void contextLoadsAndReturnsSeededLibraryThingCatalog() throws Exception {
         mockMvc.perform(get("/api/items"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4));
+                .andExpect(jsonPath("$.length()").value(139));
+
+        mockMvc.perform(get("/api/items").param("q", "Neal Stephenson"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].creator").value("Neal Stephenson"));
     }
 }
