@@ -46,7 +46,11 @@ jib {
     from {
         image = 'eclipse-temurin:25-jre'
     }
+    to {
+        image = 'us-central1-docker.pkg.dev/project-f2e57f3d-860e-486f-a44/stack-and-spine/stack-and-spine:latest'
+    }
     container {
+        mainClass = 'com.stackandspine.StackAndSpineApplication'
         ports = ['8080']
         environment = [
             'JAVA_TOOL_OPTIONS': '-XX:MaxRAMPercentage=75.0'
