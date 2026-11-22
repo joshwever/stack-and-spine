@@ -190,6 +190,7 @@ public class FirestoreMediaRepository implements MediaRepository {
         map.put("identifierCode", item.getIdentifierCode());
         map.put("genre", item.getGenre());
         map.put("shelfLocation", item.getShelfLocation());
+        map.put("coverObjectPath", item.getCoverObjectPath());
         map.put("attributes", item.getAttributes() != null ? item.getAttributes() : Map.of());
         Instant added = item.getAddedAt() != null ? item.getAddedAt() : Instant.now();
         map.put("addedAt", Timestamp.ofTimeSecondsAndNanos(added.getEpochSecond(), added.getNano()));
@@ -221,6 +222,7 @@ public class FirestoreMediaRepository implements MediaRepository {
         item.setIdentifierCode(doc.getString("identifierCode"));
         item.setGenre(doc.getString("genre"));
         item.setShelfLocation(doc.getString("shelfLocation"));
+        item.setCoverObjectPath(doc.getString("coverObjectPath"));
 
         Object rawAttrs = doc.get("attributes");
         if (rawAttrs instanceof Map<?, ?> rawMap) {

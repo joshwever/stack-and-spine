@@ -23,10 +23,30 @@
         <form id="add-item-form" method="post" action="/items" class="hidden mt-4 pt-4 border-t border-slate-800 space-y-3.5 text-sm">
             <div>
                 <label class="block text-xs text-slate-400 mb-1">Media Type *</label>
-                <select name="mediaType" required
+                <select id="add-media-type" name="mediaType" required
                         class="w-full rounded-lg bg-slate-950 border border-slate-800 px-3 py-2 text-slate-100">
                     <option th:each="mt : ${mediaTypes}" th:value="${mt.name()}" th:text="${mt.displayName}">Book</option>
                 </select>
+            </div>
+
+            <!-- Metadata Auto-Fill (OpenLibrary for Books / TMDB via Secret Manager for Discs) -->
+            <div class="rounded-lg bg-slate-950/70 border border-slate-800 p-2.5 space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-medium text-indigo-300">Auto-Fill Metadata</span>
+                    <span class="text-[10px] text-slate-500">ISBN (OpenLibrary) / Title (TMDB)</span>
+                </div>
+                <div class="flex gap-1.5">
+                    <input type="text" id="lookup-query"
+                           placeholder="ISBN or Book / Movie Title"
+                           onkeydown="if (event.key === 'Enter') { event.preventDefault(); lookupMetadata(); }"
+                           class="flex-1 min-w-0 rounded-md bg-slate-900 border border-slate-800 px-2.5 py-1.5 text-xs text-slate-100">
+                    <button type="button"
+                            onclick="lookupMetadata()"
+                            class="px-2.5 py-1.5 rounded-md bg-indigo-600/30 hover:bg-indigo-600 border border-indigo-500/40 text-xs text-indigo-200 hover:text-white transition">
+                        Lookup
+                    </button>
+                </div>
+                <p id="lookup-status" class="text-[11px] text-slate-400 hidden"></p>
             </div>
 
             <div>

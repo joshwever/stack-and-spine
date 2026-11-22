@@ -3,6 +3,10 @@ spring:
     name: stack-and-spine
   thymeleaf:
     cache: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 server:
   port: ${PORT:8080}
@@ -20,3 +24,8 @@ stackandspine:
     project-id: ${GOOGLE_CLOUD_PROJECT:project-f2e57f3d-860e-486f-a44}
     database-id: ${STACKANDSPINE_FIRESTORE_DATABASE:(default)}
     collection: ${STACKANDSPINE_FIRESTORE_COLLECTION:media_items}
+    media-bucket: ${STACKANDSPINE_MEDIA_BUCKET:stack-and-spine-media-212550439760}
+    signer-service-account: ${STACKANDSPINE_SIGNER_SA:stack-and-spine-run@project-f2e57f3d-860e-486f-a44.iam.gserviceaccount.com}
+  metadata:
+    # Injected on Cloud Run from Google Secret Manager (secret: tmdb-api-key)
+    tmdb-api-key: ${TMDB_API_KEY:NOT_CONFIGURED}

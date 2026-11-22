@@ -29,8 +29,9 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
-    // Google Cloud Firestore SDK (we will wire up Firestore in Phase 2 while learning ADC & IAM!)
+    // Google Cloud SDKs (Firestore + Cloud Storage — versions managed by Spring Cloud GCP BOM)
     implementation 'com.google.cloud:google-cloud-firestore'
+    implementation 'com.google.cloud:google-cloud-storage'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'

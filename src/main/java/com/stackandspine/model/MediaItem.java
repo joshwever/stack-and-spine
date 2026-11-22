@@ -42,6 +42,12 @@ public class MediaItem {
      */
     private Map<String, String> attributes = new HashMap<>();
 
+    /** GCS object path inside the private media bucket (e.g., "covers/lt-230813791.jpg"). */
+    private String coverObjectPath;
+
+    /** Short-lived V4 Signed URL generated at render time (not persisted in Firestore). */
+    private String coverImageUrl;
+
     private Instant addedAt = Instant.now();
 
     public MediaItem() {
@@ -141,6 +147,22 @@ public class MediaItem {
 
     public void setAttributes(Map<String, String> attributes) {
         this.attributes = attributes != null ? attributes : new HashMap<>();
+    }
+
+    public String getCoverObjectPath() {
+        return coverObjectPath;
+    }
+
+    public void setCoverObjectPath(String coverObjectPath) {
+        this.coverObjectPath = coverObjectPath;
+    }
+
+    public String getCoverImageUrl() {
+        return coverImageUrl;
+    }
+
+    public void setCoverImageUrl(String coverImageUrl) {
+        this.coverImageUrl = coverImageUrl;
     }
 
     public Instant getAddedAt() {
