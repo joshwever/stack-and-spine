@@ -8,9 +8,15 @@ import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
 import java.io.IOException;
+import java.net.URI;
 import java.net.URL;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -35,6 +41,10 @@ public class CoverStorageService {
     private final String bucketName;
     private final String signerServiceAccount;
     private final boolean gcsEnabled;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
 
     private volatile Storage storageClient;
     private volatile ServiceAccountSigner cachedSigner;
@@ -94,6 +104,82 @@ public class CoverStorageService {
         getStorage().create(blobInfo, file.getBytes());
         log.info("Uploaded cover image to gs://{}/{}", bucketName, objectPath);
         return objectPath;
+    }
+
+    /**
+     * Returns the OpenLibrary Covers API URL for an ISBN-10 or ISBN-13, or null if not a valid ISBN.
+     */
+    public String openLibraryCoverUrl(String rawIsbn) {
+        if (rawIsbn == null || rawIsbn.isBlank()) {
+            return null;
+        }
+        String clean = rawIsbn.replaceAll("[^0-9Xx]", "");
+        if (clean.length() != 10 && clean.length() != 13) {
+            return null;
+        }
+        return "https://covers.openlibrary.org/b/isbn/" + clean + "-M.jpg?default=false";
+    }
+
+    /**
+     * Downloads a book's cover image from OpenLibrary Covers API and archives it into
+     * the private GCS bucket under `covers/<itemId>-<uuid>.jpg`.
+     */
+    public Optional<String> fetchAndUploadOpenLibraryCover(String itemId, String rawIsbn) {
+        if (!gcsEnabled) {
+            return Optional.empty();
+        }
+        String coverUrl = openLibraryCoverUrl(rawIsbn);
+        if (coverUrl == null) {
+            return Optional.empty();
+        }
+
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(coverUrl))
+                    .timeout(Duration.ofSeconds(8))
+                    .header("User-Agent", "StackAndSpine/1.0")
+                    .GET()
+                    .build();
+
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() != 200 || response.body() == null || response.body().length < 500) {
+                log.info("No OpenLibrary cover available at {} (HTTP {})", coverUrl, response.statusCode());
+                return Optional.empty();
+            }
+
+            String contentType = response.headers()
+                    .firstValue("content-type")
+                    .map(v -> v.split(";")[0].trim().toLowerCase(Locale.ROOT))
+                    .orElse("image/jpeg");
+            if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
+                return Optional.empty();
+            }
+
+            String extension = switch (contentType) {
+                case "image/png" -> ".png";
+                case "image/webp" -> ".webp";
+                case "image/gif" -> ".gif";
+                default -> ".jpg";
+            };
+
+            String safeItemId = itemId.replaceAll("[^a-zA-Z0-9_-]", "_");
+            String objectPath = "covers/" + safeItemId + "-" + UUID.randomUUID().toString().substring(0, 8) + extension;
+
+            BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectPath))
+                    .setContentType(contentType)
+                    .setCacheControl("private, max-age=3600")
+                    .build();
+
+            getStorage().create(blobInfo, response.body());
+            log.info("Archived OpenLibrary cover ({} bytes) to gs://{}/{}", response.body().length, bucketName, objectPath);
+            return Optional.of(objectPath);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return Optional.empty();
+        } catch (Exception e) {
+            log.warn("Failed to archive OpenLibrary cover for item {} (ISBN {}): {}", itemId, rawIsbn, e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**

@@ -91,7 +91,17 @@ public class CatalogController {
         }
         newItem.setAttributes(attrs);
 
-        mediaRepository.save(newItem);
+        MediaItem saved = mediaRepository.save(newItem);
+        if (coverStorageService.isEnabled()
+                && saved.getMediaType() == MediaType.BOOK
+                && saved.getIdentifierCode() != null
+                && !saved.getIdentifierCode().isBlank()) {
+            coverStorageService.fetchAndUploadOpenLibraryCover(saved.getId(), saved.getIdentifierCode())
+                    .ifPresent(objectPath -> {
+                        saved.setCoverObjectPath(objectPath);
+                        mediaRepository.save(saved);
+                    });
+        }
         return "redirect:/";
     }
 
@@ -106,6 +116,20 @@ public class CatalogController {
                 mediaRepository.save(item);
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to upload cover image to Cloud Storage", e);
+            }
+        });
+        return "redirect:/";
+    }
+
+    @PostMapping("/items/{id}/cover/fetch")
+    public String fetchOpenLibraryCover(@PathVariable("id") String id) {
+        mediaRepository.findById(id).ifPresent(item -> {
+            if (item.getIdentifierCode() != null && !item.getIdentifierCode().isBlank()) {
+                coverStorageService.fetchAndUploadOpenLibraryCover(item.getId(), item.getIdentifierCode())
+                        .ifPresent(objectPath -> {
+                            item.setCoverObjectPath(objectPath);
+                            mediaRepository.save(item);
+                        });
             }
         });
         return "redirect:/";
@@ -137,12 +161,13 @@ public class CatalogController {
     }
 
     private void enrichCoverUrls(List<MediaItem> items) {
-        if (!coverStorageService.isEnabled()) {
-            return;
-        }
         for (MediaItem item : items) {
-            if (item.getCoverObjectPath() != null && !item.getCoverObjectPath().isBlank()) {
+            if (coverStorageService.isEnabled()
+                    && item.getCoverObjectPath() != null
+                    && !item.getCoverObjectPath().isBlank()) {
                 item.setCoverImageUrl(coverStorageService.generateSignedReadUrl(item.getCoverObjectPath()));
+            } else if (item.getMediaType() == MediaType.BOOK) {
+                item.setCoverImageUrl(coverStorageService.openLibraryCoverUrl(item.getIdentifierCode()));
             }
         }
     }
