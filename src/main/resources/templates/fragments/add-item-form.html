@@ -37,6 +37,7 @@
                 </div>
                 <div class="flex gap-1.5">
                     <input type="text" id="lookup-query"
+                           autocomplete="off"
                            placeholder="ISBN or Book / Movie Title"
                            onkeydown="if (event.key === 'Enter') { event.preventDefault(); lookupMetadata(); }"
                            class="flex-1 min-w-0 rounded-md bg-slate-900 border border-slate-800 px-2.5 py-1.5 text-xs text-slate-100">
