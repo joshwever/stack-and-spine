@@ -44,17 +44,23 @@ public class CatalogController {
             @RequestParam(name = "type", required = false) MediaType mediaType,
             @RequestParam(name = "q", required = false) String query,
             @RequestHeader(name = "HX-Request", required = false) String hxRequest,
+            @RequestHeader(name = "X-Goog-Authenticated-User-Email", required = false) String iapUserEmail,
             Model model) {
 
         List<MediaItem> items = mediaRepository.findByTypeAndQuery(mediaType, query);
         enrichCoverUrls(items);
         List<MediaItem> allItems = mediaRepository.findAll();
 
+        String authenticatedUser = (iapUserEmail != null && !iapUserEmail.isBlank())
+                ? iapUserEmail.replaceFirst("^accounts\\.google\\.com:", "")
+                : null;
+
         model.addAttribute("items", items);
         model.addAttribute("selectedType", mediaType);
         model.addAttribute("query", query == null ? "" : query);
         model.addAttribute("mediaTypes", MediaType.values());
         model.addAttribute("storageBackend", mediaRepository.storageBackendName());
+        model.addAttribute("authenticatedUser", authenticatedUser);
         model.addAttribute("gcsEnabled", coverStorageService.isEnabled());
         model.addAttribute("tmdbConfigured", metadataLookupService.isTmdbConfigured());
         model.addAttribute("totalCount", allItems.size());

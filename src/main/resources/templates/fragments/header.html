@@ -12,6 +12,9 @@
                     <p class="text-xs text-slate-400">
                         Storage Backend:
                         <span class="text-emerald-400 font-mono" th:text="${storageBackend}">In-Memory</span>
+                        <span th:if="${authenticatedUser != null}" class="ml-2 pl-2 border-l border-slate-700 text-sky-400">
+                            IAP: <span class="font-mono" th:text="${authenticatedUser}">user@example.com</span>
+                        </span>
                     </p>
                 </div>
             </div>
