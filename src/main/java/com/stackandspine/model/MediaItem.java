@@ -1,7 +1,10 @@
 package com.stackandspine.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -182,5 +185,31 @@ public class MediaItem {
 
     public void setAddedAt(Instant addedAt) {
         this.addedAt = addedAt;
+    }
+
+    /**
+     * Returns a YouTube trailer link for Blu-Ray and DVD items (using a custom "Trailer"
+     * attribute if present, otherwise a YouTube search query for "{title} {year} official trailer").
+     */
+    @JsonIgnore
+    public String getYoutubeTrailerUrl() {
+        if (mediaType != MediaType.BLU_RAY && mediaType != MediaType.DVD) {
+            return null;
+        }
+        if (attributes != null) {
+            String custom = attributes.get("Trailer");
+            if (custom != null && (custom.startsWith("https://") || custom.startsWith("http://"))) {
+                return custom.trim();
+            }
+        }
+        if (title == null || title.isBlank()) {
+            return null;
+        }
+        StringBuilder q = new StringBuilder(title.trim());
+        if (releaseYear != null) {
+            q.append(" ").append(releaseYear);
+        }
+        q.append(" official trailer");
+        return "https://www.youtube.com/results?search_query=" + URLEncoder.encode(q.toString(), StandardCharsets.UTF_8);
     }
 }
