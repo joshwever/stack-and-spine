@@ -15,6 +15,7 @@ A personal mixed-media catalog (**Books, Blu-Rays, and DVDs**) built with **Java
 | **Media Assets** | **Cloud Storage (GCS)** (`us-central1`) | Private bucket (`uniform_bucket_level_access` + `public_access_prevention`) for uploaded and OpenLibrary-archived covers, served via 15-minute **keyless V4 Signed URLs** (`iamcredentials.googleapis.com`). |
 | **Secrets** | **Secret Manager** | Stores `tmdb-api-key` and injects it into Cloud Run via `--set-secrets` with secret-scoped IAM. |
 | **Zero-Trust Auth** | **Identity-Aware Proxy (IAP)** | Native Cloud Run IAP enforcing Google Sign-In at Google's edge (`roles/iap.httpsResourceAccessor`) and forwarding `X-Goog-Authenticated-User-Email`. |
+| **Event-Driven AI** | **Eventarc** + **Pub/Sub** + **Vertex AI (`gemini-3-flash-preview`)** | Asynchronous **AI Photo Scan** pipeline: uploading a cover/spine photo to GCS `inbox/` triggers an internal-only Cloud Run worker (`stack-and-spine-enricher`) that uses Gemini Vision to auto-catalog the item in Firestore. |
 | **IaC & CI/CD** | **Terraform** (`infra/`) + **Cloud Build** (`cloudbuild.yaml`) | Declarative GCP infrastructure (with `import` blocks) and serverless test/build/deploy pipeline using a dedicated least-privilege builder Service Account. |
 
 ---
@@ -29,6 +30,9 @@ A personal mixed-media catalog (**Books, Blu-Rays, and DVDs**) built with **Java
 - **Cover Art Management**:
   - Automatic OpenLibrary cover display for books with ISBNs.
   - One-click **Upload Cover** or **Fetch to GCS** to archive covers into the private GCS bucket and serve them via V4 Signed URLs.
+- **AI Photo Scan (Event-Driven Enrichment)**:
+  - Click **AI Scan** from desktop or mobile to upload a photo of a book cover, Blu-Ray/DVD case, or spine to GCS `inbox/`.
+  - **Eventarc** (`google.cloud.storage.object.v1.finalized`) delivers a CloudEvent to the internal-only `stack-and-spine-enricher` worker (`POST /events/gcs-inbox`), which calls **Vertex AI Gemini (`gemini-3-flash-preview`, `global`)** directly on the `gs://` URI and writes the extracted `MediaItem` into Firestore with the photo attached as its cover.
 
 ---
 

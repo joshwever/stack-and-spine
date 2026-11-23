@@ -43,6 +43,7 @@ public class CatalogController {
     public String index(
             @RequestParam(name = "type", required = false) MediaType mediaType,
             @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "scanned", required = false) Boolean scanned,
             @RequestHeader(name = "HX-Request", required = false) String hxRequest,
             @RequestHeader(name = "X-Goog-Authenticated-User-Email", required = false) String iapUserEmail,
             Model model) {
@@ -58,6 +59,7 @@ public class CatalogController {
         model.addAttribute("items", items);
         model.addAttribute("selectedType", mediaType);
         model.addAttribute("query", query == null ? "" : query);
+        model.addAttribute("scanned", Boolean.TRUE.equals(scanned));
         model.addAttribute("mediaTypes", MediaType.values());
         model.addAttribute("storageBackend", mediaRepository.storageBackendName());
         model.addAttribute("authenticatedUser", authenticatedUser);
@@ -125,6 +127,12 @@ public class CatalogController {
             }
         });
         return "redirect:/";
+    }
+
+    @PostMapping("/inbox/scan")
+    public String uploadInboxScan(@RequestParam("file") MultipartFile file) throws IOException {
+        coverStorageService.uploadInboxPhoto(file);
+        return "redirect:/?scanned=true";
     }
 
     @PostMapping("/items/{id}/cover/fetch")

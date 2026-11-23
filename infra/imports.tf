@@ -32,3 +32,13 @@ import {
   to = google_cloud_run_v2_service.app
   id = "projects/project-f2e57f3d-860e-486f-a44/locations/us-central1/services/stack-and-spine"
 }
+
+import {
+  to = google_cloud_run_v2_service.enricher
+  id = "projects/project-f2e57f3d-860e-486f-a44/locations/us-central1/services/stack-and-spine-enricher"
+}
+
+import {
+  to = google_eventarc_trigger.gcs_inbox
+  id = "projects/project-f2e57f3d-860e-486f-a44/locations/us-central1/triggers/stack-and-spine-inbox-trigger"
+}

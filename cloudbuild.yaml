@@ -24,14 +24,26 @@ steps:
         ./gradlew test jib \
           -Djib.to.image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${_IMAGE_TAG}
 
-  # Step 2: Deploy the freshly pushed image to Cloud Run
-  - id: 'deploy-cloud-run'
+  # Step 2: Deploy the freshly pushed image to the IAP-protected web UI
+  - id: 'deploy-cloud-run-web'
     name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
     entrypoint: 'gcloud'
     args:
       - 'run'
       - 'deploy'
       - '${_SERVICE}'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${_IMAGE_TAG}'
+      - '--region=${_REGION}'
+      - '--quiet'
+
+  # Step 3: Deploy the same image to the private Eventarc AI enricher worker
+  - id: 'deploy-cloud-run-enricher'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE}-enricher'
       - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${_IMAGE_TAG}'
       - '--region=${_REGION}'
       - '--quiet'

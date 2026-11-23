@@ -11,6 +11,19 @@
     <!-- Top Header + Stats Pills -->
     <header th:replace="~{fragments/header :: header}"></header>
 
+    <div th:if="${scanned}"
+         class="max-w-6xl mx-auto px-6 pt-4">
+        <div class="rounded-xl bg-emerald-950/70 border border-emerald-700/60 px-4 py-3 text-xs text-emerald-200 flex items-center justify-between gap-3">
+            <span>
+                <strong>AI Photo Scan uploaded to Cloud Storage (<code>inbox/</code>)!</strong>
+                Eventarc is triggering Vertex AI Gemini to identify and catalog your item in Firestore—refresh in ~5–10 seconds to see it appear.
+            </span>
+            <a href="/" class="shrink-0 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-medium">
+                Refresh
+            </a>
+        </div>
+    </div>
+
     <main id="main-layout"
           data-expanded="false"
           class="group/layout max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-[auto_1fr] gap-6 items-start">

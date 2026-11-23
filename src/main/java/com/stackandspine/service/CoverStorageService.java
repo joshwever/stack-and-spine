@@ -107,6 +107,43 @@ public class CoverStorageService {
     }
 
     /**
+     * Uploads a cover/spine photo to the `inbox/` prefix in the private GCS bucket,
+     * triggering the Eventarc -> Vertex AI Gemini asynchronous enrichment pipeline.
+     */
+    public String uploadInboxPhoto(MultipartFile file) throws IOException {
+        if (!gcsEnabled) {
+            throw new IllegalStateException("AI Photo Scan requires stackandspine.storage=firestore and a configured media bucket.");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Uploaded photo is empty.");
+        }
+
+        String contentType = file.getContentType() != null
+                ? file.getContentType().toLowerCase(Locale.ROOT)
+                : "application/octet-stream";
+        if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new IllegalArgumentException("Unsupported image type: " + contentType + ". Use JPEG, PNG, WebP, or GIF.");
+        }
+
+        String extension = switch (contentType) {
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            case "image/gif" -> ".gif";
+            default -> ".jpg";
+        };
+
+        String objectPath = "inbox/" + UUID.randomUUID() + extension;
+        BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectPath))
+                .setContentType(contentType)
+                .setCacheControl("private, max-age=3600")
+                .build();
+
+        getStorage().create(blobInfo, file.getBytes());
+        log.info("Uploaded AI scan photo to gs://{}/{} (Eventarc trigger will process)", bucketName, objectPath);
+        return objectPath;
+    }
+
+    /**
      * Returns the OpenLibrary Covers API URL for an ISBN-10 or ISBN-13, or null if not a valid ISBN.
      */
     public String openLibraryCoverUrl(String rawIsbn) {

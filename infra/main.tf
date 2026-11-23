@@ -5,12 +5,15 @@ locals {
   iap_service_agent = "service-${var.project_number}@gcp-sa-iap.iam.gserviceaccount.com"
 
   enabled_apis = toset([
+    "aiplatform.googleapis.com",
     "artifactregistry.googleapis.com",
     "cloudbuild.googleapis.com",
     "cloudresourcemanager.googleapis.com",
+    "eventarc.googleapis.com",
     "firestore.googleapis.com",
     "iamcredentials.googleapis.com",
     "iap.googleapis.com",
+    "pubsub.googleapis.com",
     "run.googleapis.com",
     "secretmanager.googleapis.com",
     "storage.googleapis.com",
@@ -170,4 +173,102 @@ resource "google_iap_web_cloud_run_service_iam_member" "authorized_user" {
   cloud_run_service_name = google_cloud_run_v2_service.app.name
   role                   = "roles/iap.httpsResourceAccessor"
   member                 = "user:${var.authorized_user_email}"
+}
+
+# 8. Phase 6 — Event-Driven AI Enrichment (GCS -> Eventarc -> Private Worker -> Vertex AI Gemini)
+resource "google_project_iam_member" "runtime_vertex_ai_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.cloud_run_runtime.email}"
+}
+
+resource "google_project_iam_member" "runtime_eventarc_receiver" {
+  project = var.project_id
+  role    = "roles/eventarc.eventReceiver"
+  member  = "serviceAccount:${google_service_account.cloud_run_runtime.email}"
+}
+
+resource "google_project_iam_member" "gcs_pubsub_publisher" {
+  project = var.project_id
+  role    = "roles/pubsub.publisher"
+  member  = "serviceAccount:service-${var.project_number}@gs-project-accounts.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "eventarc_service_agent" {
+  project = var.project_id
+  role    = "roles/eventarc.serviceAgent"
+  member  = "serviceAccount:service-${var.project_number}@gcp-sa-eventarc.iam.gserviceaccount.com"
+}
+
+resource "google_cloud_run_v2_service" "enricher" {
+  project  = var.project_id
+  name     = "stack-and-spine-enricher"
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_INTERNAL_ONLY"
+
+  template {
+    service_account = google_service_account.cloud_run_runtime.email
+
+    containers {
+      image = local.image_url
+
+      env {
+        name  = "STACKANDSPINE_STORAGE"
+        value = "firestore"
+      }
+      env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
+      }
+      env {
+        name  = "STACKANDSPINE_MEDIA_BUCKET"
+        value = google_storage_bucket.media.name
+      }
+      env {
+        name  = "STACKANDSPINE_SIGNER_SA"
+        value = google_service_account.cloud_run_runtime.email
+      }
+    }
+  }
+
+  depends_on = [google_project_service.apis["run.googleapis.com"]]
+}
+
+resource "google_cloud_run_v2_service_iam_member" "enricher_invoker" {
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.enricher.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${google_service_account.cloud_run_runtime.email}"
+}
+
+resource "google_eventarc_trigger" "gcs_inbox" {
+  project         = var.project_id
+  name            = "stack-and-spine-inbox-trigger"
+  location        = var.region
+  service_account = google_service_account.cloud_run_runtime.email
+
+  matching_criteria {
+    attribute = "type"
+    value     = "google.cloud.storage.object.v1.finalized"
+  }
+  matching_criteria {
+    attribute = "bucket"
+    value     = google_storage_bucket.media.name
+  }
+
+  destination {
+    cloud_run_service {
+      service = google_cloud_run_v2_service.enricher.name
+      region  = var.region
+      path    = "/events/gcs-inbox"
+    }
+  }
+
+  depends_on = [
+    google_project_service.apis["eventarc.googleapis.com"],
+    google_project_iam_member.gcs_pubsub_publisher,
+    google_project_iam_member.eventarc_service_agent,
+    google_cloud_run_v2_service_iam_member.enricher_invoker,
+  ]
 }
