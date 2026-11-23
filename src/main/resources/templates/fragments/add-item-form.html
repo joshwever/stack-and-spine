@@ -9,19 +9,34 @@
                 <h2 class="text-sm font-semibold text-white leading-tight">Add to Collection</h2>
                 <p class="text-xs text-slate-400 mt-0.5">Add manually or AI-scan a cover photo.</p>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-3 shrink-0">
                 <form th:if="${gcsEnabled}"
                       action="/inbox/scan"
                       method="post"
                       enctype="multipart/form-data"
                       class="flex items-center">
-                    <label title="Upload a book/Blu-Ray/DVD cover or spine photo for Eventarc + Gemini AI auto-cataloging"
-                           class="h-9 px-2.5 shrink-0 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/40 text-emerald-300 hover:text-white flex items-center justify-center text-xs font-medium cursor-pointer transition">
+                    <label title="Snap a cover or spine photo with your camera (auto-cropped by Gemini AI)"
+                           class="h-9 px-3 shrink-0 whitespace-nowrap rounded-lg bg-emerald-600/20 hover:bg-emerald-600 border border-emerald-500/40 text-emerald-300 hover:text-white flex items-center justify-center text-xs font-medium cursor-pointer transition">
                         AI Scan
                         <input type="file"
                                name="file"
-                               accept="image/jpeg,image/png,image/webp,image/gif"
+                               accept="image/*"
                                capture="environment"
+                               class="hidden"
+                               onchange="this.form.submit()">
+                    </label>
+                </form>
+                <form th:if="${gcsEnabled}"
+                      action="/inbox/scan"
+                      method="post"
+                      enctype="multipart/form-data"
+                      class="flex items-center">
+                    <label title="Pick an existing or document-scanned photo from your gallery for AI cataloging"
+                           class="h-9 px-3 shrink-0 whitespace-nowrap rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs font-medium cursor-pointer transition">
+                        Photos
+                        <input type="file"
+                               name="file"
+                               accept="image/*"
                                class="hidden"
                                onchange="this.form.submit()">
                     </label>

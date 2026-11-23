@@ -7,6 +7,11 @@ import com.google.cloud.storage.BlobId;
 import com.google.cloud.storage.BlobInfo;
 import com.google.cloud.storage.Storage;
 import com.google.cloud.storage.StorageOptions;
+import java.awt.Graphics2D;
+import java.awt.geom.AffineTransform;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
@@ -20,6 +25,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import javax.imageio.ImageIO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -141,6 +147,184 @@ public class CoverStorageService {
         getStorage().create(blobInfo, file.getBytes());
         log.info("Uploaded AI scan photo to gs://{}/{} (Eventarc trigger will process)", bucketName, objectPath);
         return objectPath;
+    }
+
+    /**
+     * Downloads an inbox photo from GCS, crops it to the Gemini-detected normalized [0..1000]
+     * bounding box [ymin, xmin, ymax, xmax], and saves the clean cropped JPEG under `covers/`.
+     */
+    public Optional<String> cropAndSaveCover(
+            String sourceBucket,
+            String sourceObjectPath,
+            String itemId,
+            int ymin,
+            int xmin,
+            int ymax,
+            int xmax) {
+        if (!gcsEnabled) {
+            return Optional.empty();
+        }
+        try {
+            byte[] rawBytes = getStorage().readAllBytes(BlobId.of(sourceBucket, sourceObjectPath));
+            BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(rawBytes));
+            if (decoded == null) {
+                log.warn("Could not decode image gs://{}/{} for auto-cropping", sourceBucket, sourceObjectPath);
+                return Optional.empty();
+            }
+
+            // Apply EXIF Orientation (e.g. Pixel portrait photos stored sideways with Orientation=6)
+            // so the pixel buffer matches the upright orientation Gemini used for coverBox2d.
+            int exifOrientation = readJpegExifOrientation(rawBytes);
+            BufferedImage source = applyExifOrientation(decoded, exifOrientation);
+
+            int imgW = source.getWidth();
+            int imgH = source.getHeight();
+
+            // Convert Gemini normalized 0..1000 coords to pixels, with ~1% margin clamped to image bounds
+            int x1 = Math.max(0, (int) Math.floor(((xmin - 10) / 1000.0) * imgW));
+            int y1 = Math.max(0, (int) Math.floor(((ymin - 10) / 1000.0) * imgH));
+            int x2 = Math.min(imgW, (int) Math.ceil(((xmax + 10) / 1000.0) * imgW));
+            int y2 = Math.min(imgH, (int) Math.ceil(((ymax + 10) / 1000.0) * imgH));
+
+            int cropW = x2 - x1;
+            int cropH = y2 - y1;
+            if (cropW < imgW * 0.10 || cropH < imgH * 0.10) {
+                log.info("Skipping auto-crop for {} (box too small: {}x{} of {}x{})", sourceObjectPath, cropW, cropH, imgW, imgH);
+                return Optional.empty();
+            }
+
+            BufferedImage sub = source.getSubimage(x1, y1, cropW, cropH);
+            // Convert to TYPE_INT_RGB so ImageIO JPEG writer never fails on alpha channels
+            BufferedImage rgb = new BufferedImage(cropW, cropH, BufferedImage.TYPE_INT_RGB);
+            rgb.getGraphics().drawImage(sub, 0, 0, null);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(rgb, "jpg", out);
+
+            String safeItemId = itemId.replaceAll("[^a-zA-Z0-9_-]", "_");
+            String destPath = "covers/" + safeItemId + "-cropped.jpg";
+            BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, destPath))
+                    .setContentType("image/jpeg")
+                    .setCacheControl("private, max-age=3600")
+                    .build();
+
+            getStorage().create(blobInfo, out.toByteArray());
+            log.info("Auto-cropped cover (exif={}, {}x{} -> {}x{}) saved to gs://{}/{}",
+                    exifOrientation, imgW, imgH, cropW, cropH, bucketName, destPath);
+            return Optional.of(destPath);
+        } catch (Exception e) {
+            log.warn("Auto-crop failed for gs://{}/{}: {}", sourceBucket, sourceObjectPath, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Reads the TIFF EXIF Orientation tag (0x0112) from a JPEG byte array.
+     * Returns 1 (normal) if not JPEG or no EXIF Orientation tag is present.
+     */
+    private int readJpegExifOrientation(byte[] data) {
+        if (data == null || data.length < 12 || (data[0] & 0xFF) != 0xFF || (data[1] & 0xFF) != 0xD8) {
+            return 1;
+        }
+        int pos = 2;
+        while (pos + 4 < data.length) {
+            if ((data[pos] & 0xFF) != 0xFF) {
+                return 1;
+            }
+            int marker = data[pos + 1] & 0xFF;
+            pos += 2;
+            if (marker == 0xD9 || marker == 0xDA) {
+                return 1; // EOI or SOS
+            }
+            int segLen = ((data[pos] & 0xFF) << 8) | (data[pos + 1] & 0xFF);
+            if (segLen < 2 || pos + segLen > data.length) {
+                return 1;
+            }
+            if (marker == 0xE1 && segLen >= 14
+                    && data[pos + 2] == 'E' && data[pos + 3] == 'x'
+                    && data[pos + 4] == 'i' && data[pos + 5] == 'f'
+                    && data[pos + 6] == 0 && data[pos + 7] == 0) {
+                int tiffStart = pos + 8;
+                boolean littleEndian = data[tiffStart] == 'I' && data[tiffStart + 1] == 'I';
+                int ifdOffset = readUInt32(data, tiffStart + 4, littleEndian);
+                int ifdStart = tiffStart + ifdOffset;
+                if (ifdStart + 2 > data.length) {
+                    return 1;
+                }
+                int entryCount = readUInt16(data, ifdStart, littleEndian);
+                for (int i = 0; i < entryCount; i++) {
+                    int entryPos = ifdStart + 2 + i * 12;
+                    if (entryPos + 12 > data.length) {
+                        break;
+                    }
+                    int tag = readUInt16(data, entryPos, littleEndian);
+                    if (tag == 0x0112) {
+                        return readUInt16(data, entryPos + 8, littleEndian);
+                    }
+                }
+                return 1;
+            }
+            pos += segLen;
+        }
+        return 1;
+    }
+
+    private int readUInt16(byte[] data, int offset, boolean littleEndian) {
+        if (littleEndian) {
+            return (data[offset] & 0xFF) | ((data[offset + 1] & 0xFF) << 8);
+        }
+        return ((data[offset] & 0xFF) << 8) | (data[offset + 1] & 0xFF);
+    }
+
+    private int readUInt32(byte[] data, int offset, boolean littleEndian) {
+        if (littleEndian) {
+            return (data[offset] & 0xFF)
+                    | ((data[offset + 1] & 0xFF) << 8)
+                    | ((data[offset + 2] & 0xFF) << 16)
+                    | ((data[offset + 3] & 0xFF) << 24);
+        }
+        return ((data[offset] & 0xFF) << 24)
+                | ((data[offset + 1] & 0xFF) << 16)
+                | ((data[offset + 2] & 0xFF) << 8)
+                | (data[offset + 3] & 0xFF);
+    }
+
+    private BufferedImage applyExifOrientation(BufferedImage img, int orientation) {
+        int w = img.getWidth();
+        int h = img.getHeight();
+        return switch (orientation) {
+            case 3 -> { // 180 degrees
+                BufferedImage rotated = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g = rotated.createGraphics();
+                AffineTransform tx = new AffineTransform();
+                tx.translate(w, h);
+                tx.rotate(Math.PI);
+                g.drawImage(img, tx, null);
+                g.dispose();
+                yield rotated;
+            }
+            case 6 -> { // 90 degrees clockwise (standard phone portrait)
+                BufferedImage rotated = new BufferedImage(h, w, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g = rotated.createGraphics();
+                AffineTransform tx = new AffineTransform();
+                tx.translate(h, 0);
+                tx.rotate(Math.PI / 2);
+                g.drawImage(img, tx, null);
+                g.dispose();
+                yield rotated;
+            }
+            case 8 -> { // 270 degrees clockwise (90 degrees CCW)
+                BufferedImage rotated = new BufferedImage(h, w, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g = rotated.createGraphics();
+                AffineTransform tx = new AffineTransform();
+                tx.translate(0, w);
+                tx.rotate(-Math.PI / 2);
+                g.drawImage(img, tx, null);
+                g.dispose();
+                yield rotated;
+            }
+            default -> img;
+        };
     }
 
     /**

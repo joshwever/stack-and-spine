@@ -41,6 +41,7 @@ public class VertexAiEnrichmentService {
               "releaseYear": 2020 (4-digit integer or null if unknown),
               "genre": "Primary genre (e.g., Sci-Fi, Fantasy, History, Action)",
               "identifierCode": "ISBN-13, ISBN-10, or UPC barcode digits if visible or confidently known, else null",
+              "coverBox2d": [ymin, xmin, ymax, xmax] (tight bounding box around the book cover or Blu-Ray/DVD case in normalized 0-1000 coordinates, or null if the image is already tightly cropped),
               "attributes": {
                 "Format": "e.g. Hardcover, Paperback, 4K UHD Blu-Ray, Standard DVD",
                 "Publisher": "Publisher or Studio if known"
@@ -51,17 +52,20 @@ public class VertexAiEnrichmentService {
 
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final CoverStorageService coverStorageService;
     private final String projectId;
     private final String location;
     private final String modelName;
 
     public VertexAiEnrichmentService(
             ObjectMapper objectMapper,
+            CoverStorageService coverStorageService,
             @Value("${stackandspine.gcp.project-id}") String projectId,
             @Value("${stackandspine.gcp.vertex-location:global}") String location,
             @Value("${stackandspine.gcp.gemini-model:gemini-3-flash-preview}") String modelName) {
         this.restClient = RestClient.builder().build();
         this.objectMapper = objectMapper;
+        this.coverStorageService = coverStorageService;
         this.projectId = projectId;
         this.location = location;
         this.modelName = modelName;
@@ -118,10 +122,10 @@ public class VertexAiEnrichmentService {
                 .trim();
 
         JsonNode extracted = objectMapper.readTree(cleanedJson);
-        return buildMediaItem(objectName, extracted);
+        return buildMediaItem(bucket, objectName, extracted);
     }
 
-    private MediaItem buildMediaItem(String objectName, JsonNode extracted) {
+    private MediaItem buildMediaItem(String bucket, String objectName, JsonNode extracted) {
         String id = "ai-" + shortHash(objectName);
         String title = textOrDefault(extracted, "title", "Unidentified Media Item");
         String creator = textOrDefault(extracted, "creator", "Unknown Creator");
@@ -160,6 +164,19 @@ public class VertexAiEnrichmentService {
                 "AI Scan Inbox",
                 attributes);
         item.setCoverObjectPath(objectName);
+        JsonNode box = extracted.get("coverBox2d");
+        if (box != null && box.isArray() && box.size() == 4
+                && box.get(0).isNumber() && box.get(1).isNumber()
+                && box.get(2).isNumber() && box.get(3).isNumber()) {
+            int ymin = box.get(0).asInt();
+            int xmin = box.get(1).asInt();
+            int ymax = box.get(2).asInt();
+            int xmax = box.get(3).asInt();
+            if (ymin >= 0 && xmin >= 0 && ymax <= 1000 && xmax <= 1000 && ymax > ymin && xmax > xmin) {
+                coverStorageService.cropAndSaveCover(bucket, objectName, id, ymin, xmin, ymax, xmax)
+                        .ifPresent(item::setCoverObjectPath);
+            }
+        }
         item.setAddedAt(Instant.now());
         return item;
     }
