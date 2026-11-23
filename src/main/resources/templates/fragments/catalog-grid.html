@@ -23,6 +23,7 @@
             <div class="flex items-start justify-between gap-2 mb-2">
                 <span th:switch="${item.mediaType.name()}">
                     <span th:case="'BOOK'" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-indigo-950 text-indigo-300 border border-indigo-800">Book</span>
+                    <span th:case="'EBOOK'" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-violet-950 text-violet-300 border border-violet-800">E-Book</span>
                     <span th:case="'BLU_RAY'" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-sky-950 text-sky-300 border border-sky-800">Blu-Ray</span>
                     <span th:case="'DVD'" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-amber-950 text-amber-300 border border-amber-800">DVD</span>
                 </span>
@@ -82,7 +83,7 @@
                                onchange="this.form.submit()">
                     </label>
                 </form>
-                <form th:if="${item.coverObjectPath == null and item.mediaType.name() == 'BOOK' and item.identifierCode != null and !item.identifierCode.isEmpty()}"
+                <form th:if="${item.coverObjectPath == null and (item.mediaType.name() == 'BOOK' or item.mediaType.name() == 'EBOOK') and item.identifierCode != null and !item.identifierCode.isEmpty()}"
                       th:action="@{/items/{id}/cover/fetch(id=${item.id})}"
                       method="post"
                       class="flex items-center">

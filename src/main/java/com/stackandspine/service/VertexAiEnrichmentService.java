@@ -36,7 +36,7 @@ public class VertexAiEnrichmentService {
             Return ONLY a JSON object with these exact keys:
             {
               "title": "Exact title of the book or movie/show",
-              "mediaType": "BOOK" or "BLU_RAY" or "DVD",
+              "mediaType": "BOOK" or "EBOOK" or "BLU_RAY" or "DVD",
               "creator": "Primary author (for books) or director/studio (for Blu-Ray/DVD)",
               "releaseYear": 2020 (4-digit integer or null if unknown),
               "genre": "Primary genre (e.g., Sci-Fi, Fantasy, History, Action)",

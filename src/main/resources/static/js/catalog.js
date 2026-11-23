@@ -12,6 +12,40 @@ function toggleAddItemForm() {
     icon.classList.toggle('rotate-45', isExpanded);
 }
 
+function updateActivePill(selectedType) {
+    const ringMap = {
+        '': 'ring-white/40',
+        'BOOK': 'ring-indigo-400',
+        'EBOOK': 'ring-violet-400',
+        'BLU_RAY': 'ring-sky-400',
+        'DVD': 'ring-amber-400'
+    };
+    const allRings = ['ring-2', 'ring-white/40', 'ring-indigo-400', 'ring-violet-400', 'ring-sky-400', 'ring-amber-400'];
+
+    document.querySelectorAll('#stats-pills [data-filter-type]').forEach((btn) => {
+        btn.classList.remove(...allRings);
+        if (btn.getAttribute('data-filter-type') === selectedType) {
+            btn.classList.add('ring-2', ringMap[selectedType] || 'ring-white/40');
+        }
+    });
+}
+
+function filterByType(mediaType) {
+    const select = document.getElementById('type');
+    if (select) {
+        select.value = mediaType;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    updateActivePill(mediaType);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const select = document.getElementById('type');
+    if (select) {
+        select.addEventListener('change', () => updateActivePill(select.value));
+    }
+});
+
 async function lookupMetadata() {
     const form = document.getElementById('add-item-form');
     const type = document.getElementById('add-media-type').value;

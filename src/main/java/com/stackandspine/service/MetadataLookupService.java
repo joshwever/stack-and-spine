@@ -45,7 +45,7 @@ public class MetadataLookupService {
         if (query == null || query.isBlank()) {
             return Map.of("found", false, "message", "Enter an ISBN (for books) or title (for movies) to look up.");
         }
-        if (type == MediaType.BOOK) {
+        if (type == MediaType.BOOK || type == MediaType.EBOOK) {
             return lookupBookByIsbn(query.trim());
         }
         return lookupMovieOnTmdb(query.trim());

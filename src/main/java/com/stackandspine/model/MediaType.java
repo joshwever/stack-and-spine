@@ -2,6 +2,7 @@ package com.stackandspine.model;
 
 public enum MediaType {
     BOOK("Book", "indigo"),
+    EBOOK("E-Book", "violet"),
     BLU_RAY("Blu-Ray", "sky"),
     DVD("DVD", "amber");
 

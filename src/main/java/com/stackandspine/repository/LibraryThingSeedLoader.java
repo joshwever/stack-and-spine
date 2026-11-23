@@ -81,11 +81,14 @@ public class LibraryThingSeedLoader {
         String genre = extractGenre(node);
         String shelfLocation = extractShelfLocation(node);
         Map<String, String> attributes = extractAttributes(node, booksId, identifierCode);
+        MediaType mediaType = "Ebook".equalsIgnoreCase(attributes.get("Format"))
+                ? MediaType.EBOOK
+                : MediaType.BOOK;
 
         MediaItem item = new MediaItem(
                 "lt-" + booksId,
                 title.trim(),
-                MediaType.BOOK,
+                mediaType,
                 creator,
                 releaseYear,
                 identifierCode,

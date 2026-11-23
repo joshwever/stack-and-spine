@@ -67,6 +67,7 @@ public class CatalogController {
         model.addAttribute("tmdbConfigured", metadataLookupService.isTmdbConfigured());
         model.addAttribute("totalCount", allItems.size());
         model.addAttribute("bookCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.BOOK).count());
+        model.addAttribute("ebookCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.EBOOK).count());
         model.addAttribute("bluRayCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.BLU_RAY).count());
         model.addAttribute("dvdCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.DVD).count());
         model.addAttribute("newItem", new MediaItem());
@@ -101,7 +102,7 @@ public class CatalogController {
 
         MediaItem saved = mediaRepository.save(newItem);
         if (coverStorageService.isEnabled()
-                && saved.getMediaType() == MediaType.BOOK
+                && (saved.getMediaType() == MediaType.BOOK || saved.getMediaType() == MediaType.EBOOK)
                 && saved.getIdentifierCode() != null
                 && !saved.getIdentifierCode().isBlank()) {
             coverStorageService.fetchAndUploadOpenLibraryCover(saved.getId(), saved.getIdentifierCode())
@@ -180,7 +181,7 @@ public class CatalogController {
                     && item.getCoverObjectPath() != null
                     && !item.getCoverObjectPath().isBlank()) {
                 item.setCoverImageUrl(coverStorageService.generateSignedReadUrl(item.getCoverObjectPath()));
-            } else if (item.getMediaType() == MediaType.BOOK) {
+            } else if (item.getMediaType() == MediaType.BOOK || item.getMediaType() == MediaType.EBOOK) {
                 item.setCoverImageUrl(coverStorageService.openLibraryCoverUrl(item.getIdentifierCode()));
             }
         }
