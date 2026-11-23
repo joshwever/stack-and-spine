@@ -26,6 +26,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Controller
 public class CatalogController {
 
+    private static final int PAGE_SIZE = 48;
+
     private final MediaRepository mediaRepository;
     private final CoverStorageService coverStorageService;
     private final MetadataLookupService metadataLookupService;
@@ -43,20 +45,36 @@ public class CatalogController {
     public String index(
             @RequestParam(name = "type", required = false) MediaType mediaType,
             @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "scanned", required = false) Boolean scanned,
             @RequestHeader(name = "HX-Request", required = false) String hxRequest,
             @RequestHeader(name = "X-Goog-Authenticated-User-Email", required = false) String iapUserEmail,
             Model model) {
 
-        List<MediaItem> items = mediaRepository.findByTypeAndQuery(mediaType, query);
-        enrichCoverUrls(items);
+        List<MediaItem> filteredItems = mediaRepository.findByTypeAndQuery(mediaType, query);
+        int filteredCount = filteredItems.size();
+        int totalPages = Math.max(1, (int) Math.ceil((double) filteredCount / PAGE_SIZE));
+        int currentPage = Math.min(Math.max(page, 1), totalPages);
+        int fromIndex = (currentPage - 1) * PAGE_SIZE;
+        int toIndex = Math.min(fromIndex + PAGE_SIZE, filteredCount);
+
+        List<MediaItem> pageItems = filteredCount == 0
+                ? List.of()
+                : filteredItems.subList(fromIndex, toIndex);
+        enrichCoverUrls(pageItems);
+
         List<MediaItem> allItems = mediaRepository.findAll();
 
         String authenticatedUser = (iapUserEmail != null && !iapUserEmail.isBlank())
                 ? iapUserEmail.replaceFirst("^accounts\\.google\\.com:", "")
                 : null;
 
-        model.addAttribute("items", items);
+        model.addAttribute("items", pageItems);
+        model.addAttribute("currentPage", currentPage);
+        model.addAttribute("totalPages", totalPages);
+        model.addAttribute("filteredCount", filteredCount);
+        model.addAttribute("showingFrom", filteredCount == 0 ? 0 : fromIndex + 1);
+        model.addAttribute("showingTo", toIndex);
         model.addAttribute("selectedType", mediaType);
         model.addAttribute("query", query == null ? "" : query);
         model.addAttribute("scanned", Boolean.TRUE.equals(scanned));

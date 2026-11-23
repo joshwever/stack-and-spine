@@ -13,6 +13,39 @@
              class="col-span-full bg-slate-900/50 border border-dashed border-slate-800 rounded-xl p-8 text-center text-slate-400 text-sm">
             No media items match your filter. Add one using the + button in the top right!
         </div>
+
+        <!-- Pagination Bar -->
+        <nav th:if="${totalPages != null and totalPages > 1}"
+             aria-label="Catalog pagination"
+             class="col-span-full mt-2 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-400">
+            <span>
+                Showing <strong class="text-slate-200" th:text="${showingFrom}">1</strong>–<strong class="text-slate-200" th:text="${showingTo}">48</strong>
+                of <strong class="text-slate-200" th:text="${filteredCount}">2780</strong> items
+                (Page <strong class="text-slate-200" th:text="${currentPage}">1</strong> of <strong class="text-slate-200" th:text="${totalPages}">58</strong>)
+            </span>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        th:if="${currentPage > 1}"
+                        th:attr="hx-get=@{/(type=${selectedType != null ? selectedType.name() : ''},q=${query},page=${currentPage - 1})}"
+                        hx-target="#catalog-grid"
+                        hx-swap="outerHTML"
+                        hx-push-url="true"
+                        onclick="window.scrollTo({top: 0, behavior: 'smooth'})"
+                        class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+                    ← Previous
+                </button>
+                <button type="button"
+                        th:if="${currentPage < totalPages}"
+                        th:attr="hx-get=@{/(type=${selectedType != null ? selectedType.name() : ''},q=${query},page=${currentPage + 1})}"
+                        hx-target="#catalog-grid"
+                        hx-swap="outerHTML"
+                        hx-push-url="true"
+                        onclick="window.scrollTo({top: 0, behavior: 'smooth'})"
+                        class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition">
+                    Next →
+                </button>
+            </div>
+        </nav>
     </div>
 
     <!-- Single Media Item Card Fragment -->

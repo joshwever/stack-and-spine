@@ -10,6 +10,7 @@ import com.google.cloud.firestore.WriteBatch;
 import com.stackandspine.model.MediaItem;
 import com.stackandspine.model.MediaType;
 import jakarta.annotation.PostConstruct;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -37,11 +38,15 @@ import org.springframework.stereotype.Repository;
 public class FirestoreMediaRepository implements MediaRepository {
 
     private static final Logger log = LoggerFactory.getLogger(FirestoreMediaRepository.class);
+    private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
     private final Firestore firestore;
     private final LibraryThingSeedLoader seedLoader;
     private final String projectId;
     private final String collectionName;
+
+    private volatile List<MediaItem> cachedItems;
+    private volatile Instant cacheLoadedAt = Instant.EPOCH;
 
     public FirestoreMediaRepository(
             Firestore firestore,
@@ -95,18 +100,37 @@ public class FirestoreMediaRepository implements MediaRepository {
 
     @Override
     public List<MediaItem> findAll() {
-        try {
-            List<QueryDocumentSnapshot> docs = collection().get().get().getDocuments();
-            return docs.stream()
-                    .map(this::fromDocument)
-                    .sorted(Comparator.comparing(MediaItem::getTitle, String.CASE_INSENSITIVE_ORDER))
-                    .toList();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while querying Firestore", e);
-        } catch (ExecutionException e) {
-            throw new IllegalStateException("Failed to query Firestore collection " + collectionName, e);
+        List<MediaItem> snapshot = cachedItems;
+        if (snapshot != null && Duration.between(cacheLoadedAt, Instant.now()).compareTo(CACHE_TTL) < 0) {
+            return snapshot;
         }
+        synchronized (this) {
+            snapshot = cachedItems;
+            if (snapshot != null && Duration.between(cacheLoadedAt, Instant.now()).compareTo(CACHE_TTL) < 0) {
+                return snapshot;
+            }
+            try {
+                List<QueryDocumentSnapshot> docs = collection().get().get().getDocuments();
+                List<MediaItem> loaded = docs.stream()
+                        .map(this::fromDocument)
+                        .sorted(Comparator.comparing(MediaItem::getTitle, String.CASE_INSENSITIVE_ORDER))
+                        .toList();
+                cachedItems = loaded;
+                cacheLoadedAt = Instant.now();
+                log.info("Refreshed Firestore read-through cache ({} items)", loaded.size());
+                return loaded;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("Interrupted while querying Firestore", e);
+            } catch (ExecutionException e) {
+                throw new IllegalStateException("Failed to query Firestore collection " + collectionName, e);
+            }
+        }
+    }
+
+    private void invalidateCache() {
+        cachedItems = null;
+        cacheLoadedAt = Instant.EPOCH;
     }
 
     @Override
@@ -150,6 +174,7 @@ public class FirestoreMediaRepository implements MediaRepository {
         }
         try {
             collection().document(item.getId()).set(toDocumentMap(item)).get();
+            invalidateCache();
             return item;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -163,6 +188,7 @@ public class FirestoreMediaRepository implements MediaRepository {
     public void deleteById(String id) {
         try {
             collection().document(id).delete().get();
+            invalidateCache();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while deleting Firestore document " + id, e);
