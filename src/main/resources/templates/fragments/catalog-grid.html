@@ -90,7 +90,7 @@
                 </div>
             </div>
 
-            <!-- Brief Description (clamped on card; full text on hover popover or tap-to-expand) -->
+            <!-- Brief Description (clamped on card; scrollable hover popover + tap-to-expand) -->
             <div th:if="${item.description != null and !item.description.isEmpty()}"
                  class="relative group/desc mt-3">
                 <p th:text="${item.description}"
@@ -99,8 +99,10 @@
                     Brief description of the media item.
                 </p>
                 <div role="tooltip"
-                     class="hidden group-hover/desc:block absolute left-0 right-0 bottom-full mb-2 z-30 p-3 rounded-lg bg-slate-950 border border-slate-700 shadow-2xl shadow-black/70 text-xs text-slate-200 leading-relaxed max-h-64 overflow-y-auto pointer-events-none">
-                    <p th:text="${item.description}">Full description</p>
+                     class="hidden group-hover/desc:block absolute left-0 right-0 bottom-full pb-2 z-30">
+                    <div class="p-3 rounded-lg bg-slate-950 border border-slate-700 shadow-2xl shadow-black/70 text-xs text-slate-200 leading-relaxed max-h-64 overflow-y-auto">
+                        <p th:text="${item.description}">Full description</p>
+                    </div>
                 </div>
             </div>
 
