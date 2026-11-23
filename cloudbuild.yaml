@@ -1,0 +1,40 @@
+# Google Cloud Build CI/CD Pipeline for Stack and Spine
+# Runs unit tests, builds & pushes the layered Java 25 image via Jib (no Docker daemon),
+# and deploys the new revision to Cloud Run in us-central1.
+#
+# Run manually from WSL:
+#   gcloud builds submit --config=cloudbuild.yaml --project=project-f2e57f3d-860e-486f-a44
+# Or connect a GitHub Push Trigger on ^main$ in the Cloud Build Console.
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE: stack-and-spine
+  _REPO: stack-and-spine
+  _IMAGE_TAG: latest
+
+steps:
+  # Step 1: Run JUnit tests + build & push Java 25 container image via Jib
+  - id: 'test-and-jib-push'
+    name: 'eclipse-temurin:25-jdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        chmod +x ./gradlew
+        ./gradlew test jib \
+          -Djib.to.image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${_IMAGE_TAG}
+
+  # Step 2: Deploy the freshly pushed image to Cloud Run
+  - id: 'deploy-cloud-run'
+    name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE}'
+      - '--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE}:${_IMAGE_TAG}'
+      - '--region=${_REGION}'
+      - '--quiet'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

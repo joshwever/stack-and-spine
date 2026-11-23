@@ -6,3 +6,6 @@ build/
 .vscode/
 .DS_Store
 *.log
+.terraform/
+*.tfstate
+*.tfstate.*
