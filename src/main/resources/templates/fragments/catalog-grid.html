@@ -131,12 +131,20 @@
                 </span>
             </div>
             <span th:unless="${gcsEnabled}"></span>
-            <button type="button"
-                    th:attr="hx-delete=@{/items/{id}(id=${item.id})},hx-target='#item-card-' + ${item.id}"
-                    hx-swap="outerHTML"
-                    class="text-xs text-rose-400 hover:text-rose-300">
-                Remove
-            </button>
+            <div class="flex items-center gap-3">
+                <button type="button"
+                        th:attr="hx-get=@{/items/{id}/edit(id=${item.id})},hx-target='#item-card-' + ${item.id}"
+                        hx-swap="outerHTML"
+                        class="text-xs text-indigo-400 hover:text-indigo-300">
+                    Edit
+                </button>
+                <button type="button"
+                        th:attr="hx-delete=@{/items/{id}(id=${item.id})},hx-target='#item-card-' + ${item.id}"
+                        hx-swap="outerHTML"
+                        class="text-xs text-rose-400 hover:text-rose-300">
+                    Remove
+                </button>
+            </div>
         </div>
     </article>
 </body>

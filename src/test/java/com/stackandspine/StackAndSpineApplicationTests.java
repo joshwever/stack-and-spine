@@ -3,6 +3,7 @@ package com.stackandspine;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,5 +44,32 @@ class StackAndSpineApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("id=\"catalog-grid\"")))
                 .andExpect(content().string(not(containsString("id=\"main-layout\""))));
+    }
+
+    @Test
+    void editAndUpdateItemRendersInlineCard() throws Exception {
+        String id = "lt-230813791";
+
+        mockMvc.perform(get("/items/" + id + "/edit"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Edit Media Item")))
+                .andExpect(content().string(containsString("The Last Duel")));
+
+        mockMvc.perform(get("/items/" + id + "/card"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("item-card-" + id)));
+
+        mockMvc.perform(post("/items/" + id)
+                        .param("mediaType", "EBOOK")
+                        .param("title", "The Last Duel (Edited)")
+                        .param("creator", "Eric Jager")
+                        .param("releaseYear", "2005")
+                        .param("genre", "History")
+                        .param("shelfLocation", "Study - Top")
+                        .param("attributesText", "Format: EPUB\nPages: 256"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("The Last Duel (Edited)")))
+                .andExpect(content().string(containsString("E-Book")))
+                .andExpect(content().string(containsString("hx-swap-oob=\"true\"")));
     }
 }

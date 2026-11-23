@@ -168,6 +168,90 @@ public class CatalogController {
         return "redirect:/";
     }
 
+    @GetMapping("/items/{id}/edit")
+    public String editItemForm(@PathVariable("id") String id, Model model) {
+        MediaItem item = mediaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Media item not found: " + id));
+        StringBuilder attrsText = new StringBuilder();
+        if (item.getAttributes() != null) {
+            item.getAttributes().forEach((k, v) -> {
+                if (!attrsText.isEmpty()) {
+                    attrsText.append("\n");
+                }
+                attrsText.append(k).append(": ").append(v);
+            });
+        }
+        model.addAttribute("item", item);
+        model.addAttribute("mediaTypes", MediaType.values());
+        model.addAttribute("attributesText", attrsText.toString());
+        return "fragments/edit-item-card :: editCard";
+    }
+
+    @GetMapping("/items/{id}/card")
+    public String viewItemCard(@PathVariable("id") String id, Model model) {
+        MediaItem item = mediaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Media item not found: " + id));
+        enrichCoverUrls(List.of(item));
+        model.addAttribute("item", item);
+        model.addAttribute("gcsEnabled", coverStorageService.isEnabled());
+        return "fragments/catalog-grid :: card";
+    }
+
+    @PostMapping("/items/{id}")
+    public String updateItem(
+            @PathVariable("id") String id,
+            @RequestParam("mediaType") MediaType mediaType,
+            @RequestParam("title") String title,
+            @RequestParam("creator") String creator,
+            @RequestParam(name = "releaseYear", required = false) Integer releaseYear,
+            @RequestParam(name = "genre", required = false) String genre,
+            @RequestParam(name = "identifierCode", required = false) String identifierCode,
+            @RequestParam(name = "shelfLocation", required = false) String shelfLocation,
+            @RequestParam(name = "attributesText", required = false) String attributesText,
+            Model model) {
+
+        MediaItem existing = mediaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Media item not found: " + id));
+
+        existing.setMediaType(mediaType);
+        existing.setTitle(title.trim());
+        existing.setCreator(creator.trim());
+        existing.setReleaseYear(releaseYear);
+        existing.setGenre(genre != null && !genre.isBlank() ? genre.trim() : null);
+        existing.setIdentifierCode(identifierCode != null && !identifierCode.isBlank() ? identifierCode.trim() : null);
+        existing.setShelfLocation(shelfLocation != null && !shelfLocation.isBlank() ? shelfLocation.trim() : null);
+
+        Map<String, String> parsedAttrs = new LinkedHashMap<>();
+        if (attributesText != null && !attributesText.isBlank()) {
+            for (String line : attributesText.split("\\R")) {
+                int colon = line.indexOf(':');
+                if (colon > 0) {
+                    String k = line.substring(0, colon).trim();
+                    String v = line.substring(colon + 1).trim();
+                    if (!k.isEmpty() && !v.isEmpty()) {
+                        parsedAttrs.put(k, v);
+                    }
+                }
+            }
+        }
+        existing.setAttributes(parsedAttrs);
+
+        MediaItem saved = mediaRepository.save(existing);
+        enrichCoverUrls(List.of(saved));
+
+        List<MediaItem> allItems = mediaRepository.findAll();
+        model.addAttribute("item", saved);
+        model.addAttribute("gcsEnabled", coverStorageService.isEnabled());
+        model.addAttribute("selectedType", null);
+        model.addAttribute("totalCount", allItems.size());
+        model.addAttribute("bookCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.BOOK).count());
+        model.addAttribute("ebookCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.EBOOK).count());
+        model.addAttribute("bluRayCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.BLU_RAY).count());
+        model.addAttribute("dvdCount", allItems.stream().filter(i -> i.getMediaType() == MediaType.DVD).count());
+
+        return "fragments/edit-item-card :: updatedCardWithStats";
+    }
+
     @DeleteMapping("/items/{id}")
     @ResponseBody
     public String deleteItem(@PathVariable("id") String id) {
