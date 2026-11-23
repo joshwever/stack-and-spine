@@ -35,6 +35,9 @@ public class MediaItem {
     /** Physical shelf/room location (e.g., "Living Room - Shelf B2"). */
     private String shelfLocation;
 
+    /** Brief 1-3 sentence synopsis/description of the media item. */
+    private String description;
+
     /**
      * Flexible key-value attributes that differ by media type
      * (e.g., pages/publisher for Book; resolution/regionCode/discCount for Blu-Ray/DVD).
@@ -139,6 +142,14 @@ public class MediaItem {
 
     public void setShelfLocation(String shelfLocation) {
         this.shelfLocation = shelfLocation;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public Map<String, String> getAttributes() {

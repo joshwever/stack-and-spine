@@ -83,6 +83,7 @@ async function lookupMetadata() {
         setField('releaseYear', data.releaseYear);
         setField('genre', data.genre);
         setField('identifierCode', data.identifierCode);
+        setField('description', data.description);
         setField('attrKey1', data.attrKey1);
         setField('attrVal1', data.attrVal1);
         setField('attrKey2', data.attrKey2);

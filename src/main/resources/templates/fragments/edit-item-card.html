@@ -58,6 +58,14 @@
             </div>
 
             <div>
+                <label class="block text-[11px] text-slate-400 mb-1">Description</label>
+                <textarea name="description" rows="2"
+                          th:text="${item.description}"
+                          placeholder="Brief synopsis..."
+                          class="w-full rounded-md bg-slate-950 border border-slate-700 px-2.5 py-1.5 text-slate-100 text-[11px]"></textarea>
+            </div>
+
+            <div>
                 <label class="block text-[11px] text-slate-400 mb-1">Attributes (one <code>Key: Value</code> per line)</label>
                 <textarea name="attributesText" rows="3"
                           th:text="${attributesText}"

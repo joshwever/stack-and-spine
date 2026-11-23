@@ -207,6 +207,7 @@ public class CatalogController {
             @RequestParam(name = "genre", required = false) String genre,
             @RequestParam(name = "identifierCode", required = false) String identifierCode,
             @RequestParam(name = "shelfLocation", required = false) String shelfLocation,
+            @RequestParam(name = "description", required = false) String description,
             @RequestParam(name = "attributesText", required = false) String attributesText,
             Model model) {
 
@@ -220,6 +221,7 @@ public class CatalogController {
         existing.setGenre(genre != null && !genre.isBlank() ? genre.trim() : null);
         existing.setIdentifierCode(identifierCode != null && !identifierCode.isBlank() ? identifierCode.trim() : null);
         existing.setShelfLocation(shelfLocation != null && !shelfLocation.isBlank() ? shelfLocation.trim() : null);
+        existing.setDescription(description != null && !description.isBlank() ? description.trim() : null);
 
         Map<String, String> parsedAttrs = new LinkedHashMap<>();
         if (attributesText != null && !attributesText.isBlank()) {

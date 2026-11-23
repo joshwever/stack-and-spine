@@ -105,7 +105,7 @@ public class MetadataLookupService {
         try {
             String body = restClient.get()
                     .uri(
-                            "https://openlibrary.org/search.json?q={q}&limit=1&fields=title,author_name,first_publish_year,isbn,number_of_pages_median,publisher,subject",
+                            "https://openlibrary.org/search.json?q={q}&limit=1&fields=key,title,author_name,first_publish_year,isbn,number_of_pages_median,publisher,subject,first_sentence",
                             rawQuery)
                     .retrieve()
                     .body(String.class);
@@ -147,6 +147,16 @@ public class MetadataLookupService {
                 result.put("attrKey2", "Publisher");
                 result.put("attrVal2", publishers.get(0).asText(""));
             }
+            String desc = fetchWorkDescription(doc.path("key").asText(""));
+            if (desc == null || desc.isBlank()) {
+                JsonNode firstSentence = doc.path("first_sentence");
+                if (firstSentence.isArray() && !firstSentence.isEmpty()) {
+                    desc = firstSentence.get(0).asText("");
+                }
+            }
+            if (desc != null && !desc.isBlank()) {
+                result.put("description", truncateDescription(desc));
+            }
             return result;
         } catch (Exception e) {
             log.warn("OpenLibrary search failed for '{}': {}", rawQuery, e.getMessage());
@@ -186,10 +196,49 @@ public class MetadataLookupService {
             result.put("attrVal1", String.valueOf(movie.path("id").asInt()));
             result.put("attrKey2", "Rating");
             result.put("attrVal2", String.format("%.1f / 10", movie.path("vote_average").asDouble()));
+            String overview = movie.path("overview").asText("");
+            if (!overview.isBlank()) {
+                result.put("description", truncateDescription(overview));
+            }
             return result;
         } catch (Exception e) {
             log.warn("TMDB lookup failed for '{}': {}", titleQuery, e.getMessage());
             return Map.of("found", false, "source", "TMDB", "message", "TMDB lookup error: " + e.getMessage());
         }
+    }
+
+    private String fetchWorkDescription(String workKey) {
+        if (workKey == null || !workKey.startsWith("/works/")) {
+            return null;
+        }
+        try {
+            String body = restClient.get()
+                    .uri("https://openlibrary.org" + workKey + ".json")
+                    .retrieve()
+                    .body(String.class);
+            JsonNode work = objectMapper.readTree(body);
+            JsonNode descNode = work.get("description");
+            if (descNode == null || descNode.isNull()) {
+                return null;
+            }
+            if (descNode.isTextual()) {
+                return descNode.asText();
+            }
+            if (descNode.isObject() && descNode.has("value")) {
+                return descNode.get("value").asText();
+            }
+        } catch (Exception ignored) {
+            // Optional enrichment; ignore transient failures
+        }
+        return null;
+    }
+
+    private String truncateDescription(String raw) {
+        String cleaned = raw.replaceAll("\\s+", " ").trim();
+        if (cleaned.length() <= 2000) {
+            return cleaned;
+        }
+        int cut = cleaned.lastIndexOf(' ', 1997);
+        return (cut > 1000 ? cleaned.substring(0, cut) : cleaned.substring(0, 1997)) + "...";
     }
 }

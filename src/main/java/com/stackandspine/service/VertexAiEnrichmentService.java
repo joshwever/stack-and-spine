@@ -40,6 +40,7 @@ public class VertexAiEnrichmentService {
               "creator": "Primary author (for books) or director/studio (for Blu-Ray/DVD)",
               "releaseYear": 2020 (4-digit integer or null if unknown),
               "genre": "Primary genre (e.g., Sci-Fi, Fantasy, History, Action)",
+              "description": "Concise 1-2 sentence synopsis of the book or movie/show",
               "identifierCode": "ISBN-13, ISBN-10, or UPC barcode digits if visible or confidently known, else null",
               "coverBox2d": [ymin, xmin, ymax, xmax] (tight bounding box around the book cover or Blu-Ray/DVD case in normalized 0-1000 coordinates, or null if the image is already tightly cropped),
               "attributes": {
@@ -163,6 +164,7 @@ public class VertexAiEnrichmentService {
                 genre,
                 "AI Scan Inbox",
                 attributes);
+        item.setDescription(textOrNull(extracted, "description"));
         item.setCoverObjectPath(objectName);
         JsonNode box = extracted.get("coverBox2d");
         if (box != null && box.isArray() && box.size() == 4

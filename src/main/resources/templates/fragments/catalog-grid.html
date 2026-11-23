@@ -90,6 +90,20 @@
                 </div>
             </div>
 
+            <!-- Brief Description (clamped on card; full text on hover popover or tap-to-expand) -->
+            <div th:if="${item.description != null and !item.description.isEmpty()}"
+                 class="relative group/desc mt-3">
+                <p th:text="${item.description}"
+                   onclick="this.classList.toggle('line-clamp-3')"
+                   class="text-xs text-slate-300/90 leading-relaxed line-clamp-3 cursor-pointer">
+                    Brief description of the media item.
+                </p>
+                <div role="tooltip"
+                     class="hidden group-hover/desc:block absolute left-0 right-0 bottom-full mb-2 z-30 p-3 rounded-lg bg-slate-950 border border-slate-700 shadow-2xl shadow-black/70 text-xs text-slate-200 leading-relaxed max-h-64 overflow-y-auto pointer-events-none">
+                    <p th:text="${item.description}">Full description</p>
+                </div>
+            </div>
+
             <!-- Dynamic Type-Specific Attributes -->
             <div th:if="${item.attributes != null and !item.attributes.isEmpty()}"
                  class="mt-3 pt-3 border-t border-slate-800/80 flex flex-wrap gap-1.5">
