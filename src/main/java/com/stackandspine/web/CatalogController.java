@@ -71,6 +71,7 @@ public class CatalogController {
 
         List<MediaItem> allItems = mediaRepository.findAll(userKey);
         String authenticatedUser = userIdentityResolver.resolveAuthenticatedDisplayUser(request);
+        String authSource = userIdentityResolver.resolveAuthSource(request);
 
         model.addAttribute("items", pageItems);
         model.addAttribute("currentPage", currentPage);
@@ -84,6 +85,8 @@ public class CatalogController {
         model.addAttribute("mediaTypes", MediaType.values());
         model.addAttribute("storageBackend", mediaRepository.storageBackendName());
         model.addAttribute("authenticatedUser", authenticatedUser);
+        model.addAttribute("authSource", authSource);
+        model.addAttribute("identityPlatformSession", "Identity Platform".equals(authSource));
         model.addAttribute("gcsEnabled", coverStorageService.isEnabled());
         model.addAttribute("tmdbConfigured", metadataLookupService.isTmdbConfigured());
         model.addAttribute("totalCount", allItems.size());

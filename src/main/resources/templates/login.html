@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — Stack &amp; Spine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-6">
+
+<div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-8 space-y-6">
+    <!-- Brand Header -->
+    <div class="flex items-center gap-3">
+        <div class="h-11 w-11 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-indigo-600/30">
+            S&amp;S
+        </div>
+        <div>
+            <h1 class="text-xl font-bold tracking-tight">Stack &amp; Spine</h1>
+            <p class="text-xs text-slate-400">Personal Books, E-Books, Blu-Ray &amp; DVD Catalog</p>
+        </div>
+    </div>
+
+    <!-- Status Banners -->
+    <div th:if="${loggedOut}" class="rounded-lg bg-emerald-950/60 border border-emerald-800/70 px-4 py-3 text-sm text-emerald-300">
+        You have been signed out.
+    </div>
+
+    <div th:if="${signedInEmail != null}" class="rounded-lg bg-indigo-950/60 border border-indigo-800/70 px-4 py-3 text-sm text-indigo-200 space-y-2">
+        <p>Signed in as <span class="font-mono text-white" th:text="${signedInEmail}">user@example.com</span>.</p>
+        <div class="flex items-center gap-3">
+            <a href="/" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition">
+                Open My Catalog
+            </a>
+            <form method="post" action="/auth/logout" class="inline">
+                <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition cursor-pointer">
+                    Sign Out
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="auth-error" class="hidden rounded-lg bg-rose-950/70 border border-rose-800/70 px-4 py-3 text-sm text-rose-200"></div>
+    <div id="auth-info" class="hidden rounded-lg bg-sky-950/70 border border-sky-800/70 px-4 py-3 text-sm text-sky-200"></div>
+
+    <!-- Mode Tabs -->
+    <div class="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 text-sm">
+        <button id="tab-signin" type="button"
+                class="py-2 rounded-lg font-medium bg-indigo-600 text-white transition cursor-pointer">
+            Sign In
+        </button>
+        <button id="tab-signup" type="button"
+                class="py-2 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition cursor-pointer">
+            Create Account
+        </button>
+    </div>
+
+    <!-- Email / Password Form -->
+    <form id="email-auth-form" class="space-y-4">
+        <div>
+            <label for="email" class="block text-xs font-medium text-slate-300 mb-1.5">Email</label>
+            <input id="email" type="email" required autocomplete="email"
+                   placeholder="you@example.com"
+                   class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+            <div class="flex items-center justify-between mb-1.5">
+                <label for="password" class="block text-xs font-medium text-slate-300">Password</label>
+                <button id="forgot-password-btn" type="button"
+                        class="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer">
+                    Forgot password?
+                </button>
+            </div>
+            <input id="password" type="password" required minlength="6" autocomplete="current-password"
+                   placeholder="••••••••"
+                   class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <button id="submit-btn" type="submit"
+                class="w-full py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/20 transition cursor-pointer disabled:opacity-50">
+            Sign In
+        </button>
+    </form>
+
+    <!-- Divider -->
+    <div class="relative">
+        <div class="absolute inset-0 flex items-center">
+            <div class="w-full border-t border-slate-800"></div>
+        </div>
+        <div class="relative flex justify-center text-xs">
+            <span class="bg-slate-900 px-3 text-slate-500">or</span>
+        </div>
+    </div>
+
+    <!-- Google Sign-In -->
+    <button id="google-signin-btn" type="button"
+            class="w-full py-2.5 px-4 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 text-sm font-medium flex items-center justify-center gap-2.5 transition cursor-pointer disabled:opacity-50">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"/>
+        </svg>
+        Continue with Google
+    </button>
+
+    <p class="text-[11px] text-center text-slate-500">
+        Powered by Google Cloud Identity Platform &amp; HttpOnly Session Cookies
+    </p>
+</div>
+
+<script th:inline="javascript">
+    window.__IDENTITY_CONFIG__ = {
+        enabled: /*[[${identityEnabled}]]*/ false,
+        apiKey: /*[[${identityApiKey}]]*/ '',
+        authDomain: /*[[${identityAuthDomain}]]*/ '',
+        projectId: /*[[${identityProjectId}]]*/ ''
+    };
+</script>
+
+<script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js';
+    import {
+        getAuth,
+        GoogleAuthProvider,
+        signInWithPopup,
+        signInWithEmailAndPassword,
+        createUserWithEmailAndPassword,
+        sendPasswordResetEmail,
+        setPersistence,
+        inMemoryPersistence
+    } from 'https://www.gstatic.com/firebasejs/11.4.0/firebase-auth.js';
+
+    const cfg = window.__IDENTITY_CONFIG__;
+    const errorBox = document.getElementById('auth-error');
+    const infoBox = document.getElementById('auth-info');
+    const form = document.getElementById('email-auth-form');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const submitBtn = document.getElementById('submit-btn');
+    const googleBtn = document.getElementById('google-signin-btn');
+    const forgotBtn = document.getElementById('forgot-password-btn');
+    const tabSignin = document.getElementById('tab-signin');
+    const tabSignup = document.getElementById('tab-signup');
+
+    let isSignupMode = false;
+
+    function showError(msg) {
+        errorBox.textContent = msg;
+        errorBox.classList.remove('hidden');
+        infoBox.classList.add('hidden');
+    }
+
+    function showInfo(msg) {
+        infoBox.textContent = msg;
+        infoBox.classList.remove('hidden');
+        errorBox.classList.add('hidden');
+    }
+
+    function clearMessages() {
+        errorBox.classList.add('hidden');
+        infoBox.classList.add('hidden');
+    }
+
+    function setBusy(busy) {
+        submitBtn.disabled = busy;
+        googleBtn.disabled = busy;
+    }
+
+    function setMode(signup) {
+        isSignupMode = signup;
+        clearMessages();
+        if (signup) {
+            tabSignup.className = 'py-2 rounded-lg font-medium bg-indigo-600 text-white transition cursor-pointer';
+            tabSignin.className = 'py-2 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition cursor-pointer';
+            submitBtn.textContent = 'Create Account';
+            passwordInput.autocomplete = 'new-password';
+            forgotBtn.classList.add('hidden');
+        } else {
+            tabSignin.className = 'py-2 rounded-lg font-medium bg-indigo-600 text-white transition cursor-pointer';
+            tabSignup.className = 'py-2 rounded-lg font-medium text-slate-400 hover:text-slate-200 transition cursor-pointer';
+            submitBtn.textContent = 'Sign In';
+            passwordInput.autocomplete = 'current-password';
+            forgotBtn.classList.remove('hidden');
+        }
+    }
+
+    tabSignin.addEventListener('click', () => setMode(false));
+    tabSignup.addEventListener('click', () => setMode(true));
+
+    if (!cfg.enabled || !cfg.apiKey) {
+        showError('Identity Platform is not configured in this environment.');
+        setBusy(true);
+    } else {
+        const app = initializeApp({
+            apiKey: cfg.apiKey,
+            authDomain: cfg.authDomain,
+            projectId: cfg.projectId
+        });
+        const auth = getAuth(app);
+        // Session state lives in our server-issued HttpOnly cookie, not browser IndexedDB
+        setPersistence(auth, inMemoryPersistence);
+
+        async function establishServerSession(userCredential) {
+            const idToken = await userCredential.user.getIdToken();
+            const res = await fetch('/auth/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.error || 'Failed to establish server session.');
+            }
+            window.location.assign(data.redirect || '/');
+        }
+
+        function friendlyAuthError(err) {
+            const code = err?.code || '';
+            if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+                return 'Invalid email or password.';
+            }
+            if (code === 'auth/email-already-in-use') {
+                return 'An account with this email already exists. Switch to Sign In instead.';
+            }
+            if (code === 'auth/weak-password') {
+                return 'Password must be at least 6 characters.';
+            }
+            if (code === 'auth/operation-not-allowed') {
+                return 'This sign-in provider is not yet enabled in GCP Identity Platform. Use Email/Password or enable Google Sign-In in the GCP Console.';
+            }
+            if (code === 'auth/popup-closed-by-user') {
+                return 'Sign-in popup was closed before completing.';
+            }
+            return err?.message || 'Authentication failed.';
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearMessages();
+            setBusy(true);
+            try {
+                const email = emailInput.value.trim();
+                const password = passwordInput.value;
+                const cred = isSignupMode
+                    ? await createUserWithEmailAndPassword(auth, email, password)
+                    : await signInWithEmailAndPassword(auth, email, password);
+                await establishServerSession(cred);
+            } catch (err) {
+                showError(friendlyAuthError(err));
+                setBusy(false);
+            }
+        });
+
+        googleBtn.addEventListener('click', async () => {
+            clearMessages();
+            setBusy(true);
+            try {
+                const provider = new GoogleAuthProvider();
+                const cred = await signInWithPopup(auth, provider);
+                await establishServerSession(cred);
+            } catch (err) {
+                showError(friendlyAuthError(err));
+                setBusy(false);
+            }
+        });
+
+        forgotBtn.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            if (!email) {
+                showError('Enter your email address first, then click Forgot password.');
+                return;
+            }
+            clearMessages();
+            try {
+                await sendPasswordResetEmail(auth, email);
+                showInfo('Password reset email sent to ' + email + '.');
+            } catch (err) {
+                showError(friendlyAuthError(err));
+            }
+        });
+    }
+</script>
+</body>
+</html>

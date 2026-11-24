@@ -13,8 +13,15 @@
                         Storage Backend:
                         <span class="text-emerald-400 font-mono" th:text="${storageBackend}">In-Memory</span>
                         <span th:if="${authenticatedUser != null}" class="ml-2 pl-2 border-l border-slate-700 text-sky-400">
-                            IAP: <span class="font-mono" th:text="${authenticatedUser}">user@example.com</span>
+                            <span th:text="${authSource ?: 'User'}">IAP</span>:
+                            <span class="font-mono" th:text="${authenticatedUser}">user@example.com</span>
                         </span>
+                        <form th:if="${identityPlatformSession}" method="post" action="/auth/logout" class="inline ml-2 pl-2 border-l border-slate-700">
+                            <button type="submit" class="text-slate-300 hover:text-white underline cursor-pointer">Sign Out</button>
+                        </form>
+                        <a th:if="${!identityPlatformSession}" href="/login" class="ml-2 pl-2 border-l border-slate-700 text-indigo-400 hover:text-indigo-300 underline">
+                            Sign In
+                        </a>
                     </p>
                 </div>
             </div>

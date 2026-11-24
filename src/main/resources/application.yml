@@ -21,7 +21,16 @@ stackandspine:
   # Toggle storage backend: "firestore" (Google Cloud Firestore) or "memory" (local in-memory)
   storage: ${STACKANDSPINE_STORAGE:firestore}
   auth:
+    # "dual" (Stage 2: accepts Identity Platform session cookie OR IAP header; falls back to local user)
+    # "identity-platform" (Stage 3: enforces Identity Platform session cookie and redirects to /login)
+    mode: ${STACKANDSPINE_AUTH_MODE:dual}
     default-local-user: ${STACKANDSPINE_DEFAULT_LOCAL_USER:joshwever@gmail.com}
+    session-cookie-name: ${STACKANDSPINE_SESSION_COOKIE:ss_session}
+    session-duration-days: ${STACKANDSPINE_SESSION_DAYS:5}
+    identity-platform:
+      enabled: ${STACKANDSPINE_IDENTITY_ENABLED:true}
+      api-key: ${STACKANDSPINE_IDENTITY_API_KEY:AIzaSyAMQtsseDWrrnggORgDMUmPhWko65DOI4Q}
+      auth-domain: ${STACKANDSPINE_IDENTITY_AUTH_DOMAIN:project-f2e57f3d-860e-486f-a44.firebaseapp.com}
   gcp:
     project-id: ${GOOGLE_CLOUD_PROJECT:project-f2e57f3d-860e-486f-a44}
     database-id: ${STACKANDSPINE_FIRESTORE_DATABASE:(default)}

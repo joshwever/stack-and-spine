@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 public class UserIdentityResolver {
 
     public static final String REQUEST_USER_KEY_ATTR = "stackandspine.userKey";
+    public static final String REQUEST_AUTH_SOURCE_ATTR = "stackandspine.authSource";
     public static final String IAP_EMAIL_HEADER = "X-Goog-Authenticated-User-Email";
 
     private final String defaultLocalUserKey;
@@ -62,6 +63,28 @@ public class UserIdentityResolver {
             String iapHeader = request.getHeader(IAP_EMAIL_HEADER);
             if (iapHeader != null && !iapHeader.isBlank()) {
                 return normalizeUserKey(iapHeader);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the label of the active authentication mechanism ("Identity Platform" or "IAP"),
+     * or null when using the unauthenticated localhost fallback.
+     */
+    public String resolveAuthSource(HttpServletRequest request) {
+        if (request != null) {
+            Object sourceAttr = request.getAttribute(REQUEST_AUTH_SOURCE_ATTR);
+            if (sourceAttr instanceof String s && !s.isBlank()) {
+                return s;
+            }
+            Object userAttr = request.getAttribute(REQUEST_USER_KEY_ATTR);
+            if (userAttr instanceof String s && !s.isBlank()) {
+                return "Identity Platform";
+            }
+            String iapHeader = request.getHeader(IAP_EMAIL_HEADER);
+            if (iapHeader != null && !iapHeader.isBlank()) {
+                return "IAP";
             }
         }
         return null;

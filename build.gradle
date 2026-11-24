@@ -32,6 +32,8 @@ dependencies {
     // Google Cloud SDKs (Firestore + Cloud Storage — versions managed by Spring Cloud GCP BOM)
     implementation 'com.google.cloud:google-cloud-firestore'
     implementation 'com.google.cloud:google-cloud-storage'
+    // Google Cloud Identity Platform / Firebase Admin SDK (keyless ADC session cookie verification)
+    implementation 'com.google.firebase:firebase-admin:9.4.3'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
