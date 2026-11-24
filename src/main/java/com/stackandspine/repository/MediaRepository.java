@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MediaRepository {
-    List<MediaItem> findAll();
-    List<MediaItem> findByTypeAndQuery(MediaType mediaType, String query);
-    Optional<MediaItem> findById(String id);
-    MediaItem save(MediaItem item);
-    void deleteById(String id);
+    List<MediaItem> findAll(String userKey);
+    List<MediaItem> findByTypeAndQuery(String userKey, MediaType mediaType, String query);
+    Optional<MediaItem> findById(String userKey, String id);
+    MediaItem save(String userKey, MediaItem item);
+    void deleteById(String userKey, String id);
     String storageBackendName();
 }

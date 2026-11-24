@@ -20,9 +20,12 @@ management:
 stackandspine:
   # Toggle storage backend: "firestore" (Google Cloud Firestore) or "memory" (local in-memory)
   storage: ${STACKANDSPINE_STORAGE:firestore}
+  auth:
+    default-local-user: ${STACKANDSPINE_DEFAULT_LOCAL_USER:joshwever@gmail.com}
   gcp:
     project-id: ${GOOGLE_CLOUD_PROJECT:project-f2e57f3d-860e-486f-a44}
     database-id: ${STACKANDSPINE_FIRESTORE_DATABASE:(default)}
+    users-collection: ${STACKANDSPINE_FIRESTORE_USERS_COLLECTION:users}
     collection: ${STACKANDSPINE_FIRESTORE_COLLECTION:media_items}
     media-bucket: ${STACKANDSPINE_MEDIA_BUCKET:stack-and-spine-media-212550439760}
     signer-service-account: ${STACKANDSPINE_SIGNER_SA:stack-and-spine-run@project-f2e57f3d-860e-486f-a44.iam.gserviceaccount.com}

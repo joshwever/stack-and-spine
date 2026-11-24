@@ -2,14 +2,12 @@ package com.stackandspine.repository;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.firestore.CollectionReference;
-import com.google.cloud.firestore.DocumentReference;
 import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
-import com.google.cloud.firestore.WriteBatch;
 import com.stackandspine.model.MediaItem;
 import com.stackandspine.model.MediaType;
-import jakarta.annotation.PostConstruct;
+import com.stackandspine.service.UserIdentityResolver;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Comparator;
@@ -19,6 +17,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,11 +27,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Repository;
 
 /**
- * Google Cloud Firestore implementation of {@link MediaRepository}.
+ * Multi-tenant Google Cloud Firestore implementation of {@link MediaRepository}.
  * Active when `stackandspine.storage=firestore` (or `STACKANDSPINE_STORAGE=firestore`).
  *
- * On startup, if the Firestore collection is empty, it automatically seeds the initial
- * 139 books from {@link LibraryThingSeedLoader} using a Firestore WriteBatch.
+ * Isolates each user's catalog in a dedicated subcollection:
+ * `users/{userKey}/media_items`, with an independent per-user 60s read-through cache.
  */
 @Repository
 @ConditionalOnProperty(name = "stackandspine.storage", havingValue = "firestore")
@@ -40,103 +40,66 @@ public class FirestoreMediaRepository implements MediaRepository {
     private static final Logger log = LoggerFactory.getLogger(FirestoreMediaRepository.class);
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
+    private record CachedCatalog(List<MediaItem> items, Instant loadedAt) {}
+
     private final Firestore firestore;
-    private final LibraryThingSeedLoader seedLoader;
     private final String projectId;
+    private final String usersCollectionName;
     private final String collectionName;
 
-    private volatile List<MediaItem> cachedItems;
-    private volatile Instant cacheLoadedAt = Instant.EPOCH;
+    private final ConcurrentMap<String, CachedCatalog> cacheByUser = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Object> locksByUser = new ConcurrentHashMap<>();
 
     public FirestoreMediaRepository(
             Firestore firestore,
-            LibraryThingSeedLoader seedLoader,
             @Value("${stackandspine.gcp.project-id}") String projectId,
+            @Value("${stackandspine.gcp.users-collection:users}") String usersCollectionName,
             @Value("${stackandspine.gcp.collection:media_items}") String collectionName) {
         this.firestore = firestore;
-        this.seedLoader = seedLoader;
         this.projectId = projectId;
+        this.usersCollectionName = usersCollectionName;
         this.collectionName = collectionName;
     }
 
-    @PostConstruct
-    void seedIfEmpty() {
-        try {
-            CollectionReference col = collection();
-            boolean isEmpty = col.limit(1).get().get().isEmpty();
-            if (isEmpty) {
-                List<MediaItem> seedBooks = seedLoader.loadBooks();
-                log.info(
-                        "Firestore collection '{}' in project '{}' is empty. Seeding {} books via WriteBatch...",
-                        collectionName,
-                        projectId,
-                        seedBooks.size());
-                WriteBatch batch = firestore.batch();
-                for (MediaItem item : seedBooks) {
-                    if (item.getId() == null || item.getId().isBlank()) {
-                        item.setId(UUID.randomUUID().toString());
-                    }
-                    DocumentReference docRef = col.document(item.getId());
-                    batch.set(docRef, toDocumentMap(item));
-                }
-                batch.commit().get();
-                log.info("Successfully seeded {} books into Firestore collection '{}'", seedBooks.size(), collectionName);
-            } else {
-                log.info(
-                        "Firestore collection '{}' in project '{}' already contains data; skipping initial seed.",
-                        collectionName,
-                        projectId);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IllegalStateException("Interrupted while checking/seeding Firestore collection", e);
-        } catch (ExecutionException e) {
-            throw new IllegalStateException(
-                    "Failed to connect to or seed Firestore in project '" + projectId + "'. "
-                            + "Verify that the Firestore API + database exist and Application Default Credentials are set.",
-                    e);
-        }
-    }
-
     @Override
-    public List<MediaItem> findAll() {
-        List<MediaItem> snapshot = cachedItems;
-        if (snapshot != null && Duration.between(cacheLoadedAt, Instant.now()).compareTo(CACHE_TTL) < 0) {
-            return snapshot;
+    public List<MediaItem> findAll(String userKey) {
+        String key = UserIdentityResolver.normalizeUserKey(userKey);
+        CachedCatalog cached = cacheByUser.get(key);
+        if (cached != null && Duration.between(cached.loadedAt(), Instant.now()).compareTo(CACHE_TTL) < 0) {
+            return cached.items();
         }
-        synchronized (this) {
-            snapshot = cachedItems;
-            if (snapshot != null && Duration.between(cacheLoadedAt, Instant.now()).compareTo(CACHE_TTL) < 0) {
-                return snapshot;
+        Object userLock = locksByUser.computeIfAbsent(key, k -> new Object());
+        synchronized (userLock) {
+            cached = cacheByUser.get(key);
+            if (cached != null && Duration.between(cached.loadedAt(), Instant.now()).compareTo(CACHE_TTL) < 0) {
+                return cached.items();
             }
             try {
-                List<QueryDocumentSnapshot> docs = collection().get().get().getDocuments();
+                List<QueryDocumentSnapshot> docs = userCollection(key).get().get().getDocuments();
                 List<MediaItem> loaded = docs.stream()
                         .map(this::fromDocument)
                         .sorted(Comparator.comparing(MediaItem::getTitle, String.CASE_INSENSITIVE_ORDER))
                         .toList();
-                cachedItems = loaded;
-                cacheLoadedAt = Instant.now();
-                log.info("Refreshed Firestore read-through cache ({} items)", loaded.size());
+                cacheByUser.put(key, new CachedCatalog(loaded, Instant.now()));
+                log.info("Refreshed Firestore read-through cache for user '{}' ({} items)", key, loaded.size());
                 return loaded;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                throw new IllegalStateException("Interrupted while querying Firestore", e);
+                throw new IllegalStateException("Interrupted while querying Firestore for user " + key, e);
             } catch (ExecutionException e) {
-                throw new IllegalStateException("Failed to query Firestore collection " + collectionName, e);
+                throw new IllegalStateException("Failed to query Firestore catalog for user " + key, e);
             }
         }
     }
 
-    private void invalidateCache() {
-        cachedItems = null;
-        cacheLoadedAt = Instant.EPOCH;
+    private void invalidateUserCache(String normalizedUserKey) {
+        cacheByUser.remove(normalizedUserKey);
     }
 
     @Override
-    public List<MediaItem> findByTypeAndQuery(MediaType mediaType, String query) {
+    public List<MediaItem> findByTypeAndQuery(String userKey, MediaType mediaType, String query) {
         String normalizedQuery = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-        return findAll().stream()
+        return findAll(userKey).stream()
                 .filter(item -> mediaType == null || item.getMediaType() == mediaType)
                 .filter(item -> normalizedQuery.isEmpty()
                         || item.getTitle().toLowerCase(Locale.ROOT).contains(normalizedQuery)
@@ -149,9 +112,10 @@ public class FirestoreMediaRepository implements MediaRepository {
     }
 
     @Override
-    public Optional<MediaItem> findById(String id) {
+    public Optional<MediaItem> findById(String userKey, String id) {
+        String key = UserIdentityResolver.normalizeUserKey(userKey);
         try {
-            DocumentSnapshot doc = collection().document(id).get().get();
+            DocumentSnapshot doc = userCollection(key).document(id).get().get();
             if (!doc.exists()) {
                 return Optional.empty();
             }
@@ -165,7 +129,8 @@ public class FirestoreMediaRepository implements MediaRepository {
     }
 
     @Override
-    public MediaItem save(MediaItem item) {
+    public MediaItem save(String userKey, MediaItem item) {
+        String key = UserIdentityResolver.normalizeUserKey(userKey);
         if (item.getId() == null || item.getId().isBlank()) {
             item.setId(UUID.randomUUID().toString());
         }
@@ -173,8 +138,8 @@ public class FirestoreMediaRepository implements MediaRepository {
             item.setAddedAt(Instant.now());
         }
         try {
-            collection().document(item.getId()).set(toDocumentMap(item)).get();
-            invalidateCache();
+            userCollection(key).document(item.getId()).set(toDocumentMap(item)).get();
+            invalidateUserCache(key);
             return item;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -185,10 +150,11 @@ public class FirestoreMediaRepository implements MediaRepository {
     }
 
     @Override
-    public void deleteById(String id) {
+    public void deleteById(String userKey, String id) {
+        String key = UserIdentityResolver.normalizeUserKey(userKey);
         try {
-            collection().document(id).delete().get();
-            invalidateCache();
+            userCollection(key).document(id).delete().get();
+            invalidateUserCache(key);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while deleting Firestore document " + id, e);
@@ -199,11 +165,13 @@ public class FirestoreMediaRepository implements MediaRepository {
 
     @Override
     public String storageBackendName() {
-        return "Google Cloud Firestore (" + projectId + " / " + collectionName + ")";
+        return "Google Cloud Firestore (" + projectId + " / " + usersCollectionName + "/{user}/" + collectionName + ")";
     }
 
-    private CollectionReference collection() {
-        return firestore.collection(collectionName);
+    private CollectionReference userCollection(String normalizedUserKey) {
+        return firestore.collection(usersCollectionName)
+                .document(normalizedUserKey)
+                .collection(collectionName);
     }
 
     private Map<String, Object> toDocumentMap(MediaItem item) {
@@ -224,7 +192,6 @@ public class FirestoreMediaRepository implements MediaRepository {
         return map;
     }
 
-    @SuppressWarnings("unchecked")
     private MediaItem fromDocument(DocumentSnapshot doc) {
         MediaItem item = new MediaItem();
         item.setId(doc.getId());

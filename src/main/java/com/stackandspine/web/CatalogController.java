@@ -5,6 +5,8 @@ import com.stackandspine.model.MediaType;
 import com.stackandspine.repository.MediaRepository;
 import com.stackandspine.service.CoverStorageService;
 import com.stackandspine.service.MetadataLookupService;
+import com.stackandspine.service.UserIdentityResolver;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.io.IOException;
 import java.util.LinkedHashMap;
@@ -31,14 +33,17 @@ public class CatalogController {
     private final MediaRepository mediaRepository;
     private final CoverStorageService coverStorageService;
     private final MetadataLookupService metadataLookupService;
+    private final UserIdentityResolver userIdentityResolver;
 
     public CatalogController(
             MediaRepository mediaRepository,
             CoverStorageService coverStorageService,
-            MetadataLookupService metadataLookupService) {
+            MetadataLookupService metadataLookupService,
+            UserIdentityResolver userIdentityResolver) {
         this.mediaRepository = mediaRepository;
         this.coverStorageService = coverStorageService;
         this.metadataLookupService = metadataLookupService;
+        this.userIdentityResolver = userIdentityResolver;
     }
 
     @GetMapping("/")
@@ -48,10 +53,11 @@ public class CatalogController {
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "scanned", required = false) Boolean scanned,
             @RequestHeader(name = "HX-Request", required = false) String hxRequest,
-            @RequestHeader(name = "X-Goog-Authenticated-User-Email", required = false) String iapUserEmail,
+            HttpServletRequest request,
             Model model) {
 
-        List<MediaItem> filteredItems = mediaRepository.findByTypeAndQuery(mediaType, query);
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        List<MediaItem> filteredItems = mediaRepository.findByTypeAndQuery(userKey, mediaType, query);
         int filteredCount = filteredItems.size();
         int totalPages = Math.max(1, (int) Math.ceil((double) filteredCount / PAGE_SIZE));
         int currentPage = Math.min(Math.max(page, 1), totalPages);
@@ -63,11 +69,8 @@ public class CatalogController {
                 : filteredItems.subList(fromIndex, toIndex);
         enrichCoverUrls(pageItems);
 
-        List<MediaItem> allItems = mediaRepository.findAll();
-
-        String authenticatedUser = (iapUserEmail != null && !iapUserEmail.isBlank())
-                ? iapUserEmail.replaceFirst("^accounts\\.google\\.com:", "")
-                : null;
+        List<MediaItem> allItems = mediaRepository.findAll(userKey);
+        String authenticatedUser = userIdentityResolver.resolveAuthenticatedDisplayUser(request);
 
         model.addAttribute("items", pageItems);
         model.addAttribute("currentPage", currentPage);
@@ -103,11 +106,14 @@ public class CatalogController {
             @RequestParam(name = "attrKey1", required = false) String attrKey1,
             @RequestParam(name = "attrVal1", required = false) String attrVal1,
             @RequestParam(name = "attrKey2", required = false) String attrKey2,
-            @RequestParam(name = "attrVal2", required = false) String attrVal2) {
+            @RequestParam(name = "attrVal2", required = false) String attrVal2,
+            HttpServletRequest request) {
 
         if (bindingResult.hasErrors()) {
             return "redirect:/";
         }
+
+        String userKey = userIdentityResolver.resolveUserKey(request);
 
         Map<String, String> attrs = new LinkedHashMap<>();
         if (attrKey1 != null && !attrKey1.isBlank() && attrVal1 != null && !attrVal1.isBlank()) {
@@ -118,15 +124,15 @@ public class CatalogController {
         }
         newItem.setAttributes(attrs);
 
-        MediaItem saved = mediaRepository.save(newItem);
+        MediaItem saved = mediaRepository.save(userKey, newItem);
         if (coverStorageService.isEnabled()
                 && (saved.getMediaType() == MediaType.BOOK || saved.getMediaType() == MediaType.EBOOK)
                 && saved.getIdentifierCode() != null
                 && !saved.getIdentifierCode().isBlank()) {
-            coverStorageService.fetchAndUploadOpenLibraryCover(saved.getId(), saved.getIdentifierCode())
+            coverStorageService.fetchAndUploadOpenLibraryCover(userKey, saved.getId(), saved.getIdentifierCode())
                     .ifPresent(objectPath -> {
                         saved.setCoverObjectPath(objectPath);
-                        mediaRepository.save(saved);
+                        mediaRepository.save(userKey, saved);
                     });
         }
         return "redirect:/";
@@ -135,12 +141,14 @@ public class CatalogController {
     @PostMapping("/items/{id}/cover")
     public String uploadCover(
             @PathVariable("id") String id,
-            @RequestParam("file") MultipartFile file) throws IOException {
-        mediaRepository.findById(id).ifPresent(item -> {
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request) throws IOException {
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        mediaRepository.findById(userKey, id).ifPresent(item -> {
             try {
-                String objectPath = coverStorageService.uploadCover(id, file);
+                String objectPath = coverStorageService.uploadCover(userKey, id, file);
                 item.setCoverObjectPath(objectPath);
-                mediaRepository.save(item);
+                mediaRepository.save(userKey, item);
             } catch (IOException e) {
                 throw new IllegalStateException("Failed to upload cover image to Cloud Storage", e);
             }
@@ -149,19 +157,25 @@ public class CatalogController {
     }
 
     @PostMapping("/inbox/scan")
-    public String uploadInboxScan(@RequestParam("file") MultipartFile file) throws IOException {
-        coverStorageService.uploadInboxPhoto(file);
+    public String uploadInboxScan(
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest request) throws IOException {
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        coverStorageService.uploadInboxPhoto(userKey, file);
         return "redirect:/?scanned=true";
     }
 
     @PostMapping("/items/{id}/cover/fetch")
-    public String fetchOpenLibraryCover(@PathVariable("id") String id) {
-        mediaRepository.findById(id).ifPresent(item -> {
+    public String fetchOpenLibraryCover(
+            @PathVariable("id") String id,
+            HttpServletRequest request) {
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        mediaRepository.findById(userKey, id).ifPresent(item -> {
             if (item.getIdentifierCode() != null && !item.getIdentifierCode().isBlank()) {
-                coverStorageService.fetchAndUploadOpenLibraryCover(item.getId(), item.getIdentifierCode())
+                coverStorageService.fetchAndUploadOpenLibraryCover(userKey, item.getId(), item.getIdentifierCode())
                         .ifPresent(objectPath -> {
                             item.setCoverObjectPath(objectPath);
-                            mediaRepository.save(item);
+                            mediaRepository.save(userKey, item);
                         });
             }
         });
@@ -169,8 +183,12 @@ public class CatalogController {
     }
 
     @GetMapping("/items/{id}/edit")
-    public String editItemForm(@PathVariable("id") String id, Model model) {
-        MediaItem item = mediaRepository.findById(id)
+    public String editItemForm(
+            @PathVariable("id") String id,
+            HttpServletRequest request,
+            Model model) {
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        MediaItem item = mediaRepository.findById(userKey, id)
                 .orElseThrow(() -> new IllegalArgumentException("Media item not found: " + id));
         StringBuilder attrsText = new StringBuilder();
         if (item.getAttributes() != null) {
@@ -188,8 +206,12 @@ public class CatalogController {
     }
 
     @GetMapping("/items/{id}/card")
-    public String viewItemCard(@PathVariable("id") String id, Model model) {
-        MediaItem item = mediaRepository.findById(id)
+    public String viewItemCard(
+            @PathVariable("id") String id,
+            HttpServletRequest request,
+            Model model) {
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        MediaItem item = mediaRepository.findById(userKey, id)
                 .orElseThrow(() -> new IllegalArgumentException("Media item not found: " + id));
         enrichCoverUrls(List.of(item));
         model.addAttribute("item", item);
@@ -209,9 +231,11 @@ public class CatalogController {
             @RequestParam(name = "shelfLocation", required = false) String shelfLocation,
             @RequestParam(name = "description", required = false) String description,
             @RequestParam(name = "attributesText", required = false) String attributesText,
+            HttpServletRequest request,
             Model model) {
 
-        MediaItem existing = mediaRepository.findById(id)
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        MediaItem existing = mediaRepository.findById(userKey, id)
                 .orElseThrow(() -> new IllegalArgumentException("Media item not found: " + id));
 
         existing.setMediaType(mediaType);
@@ -238,10 +262,10 @@ public class CatalogController {
         }
         existing.setAttributes(parsedAttrs);
 
-        MediaItem saved = mediaRepository.save(existing);
+        MediaItem saved = mediaRepository.save(userKey, existing);
         enrichCoverUrls(List.of(saved));
 
-        List<MediaItem> allItems = mediaRepository.findAll();
+        List<MediaItem> allItems = mediaRepository.findAll(userKey);
         model.addAttribute("item", saved);
         model.addAttribute("gcsEnabled", coverStorageService.isEnabled());
         model.addAttribute("selectedType", null);
@@ -256,8 +280,11 @@ public class CatalogController {
 
     @DeleteMapping("/items/{id}")
     @ResponseBody
-    public String deleteItem(@PathVariable("id") String id) {
-        mediaRepository.deleteById(id);
+    public String deleteItem(
+            @PathVariable("id") String id,
+            HttpServletRequest request) {
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        mediaRepository.deleteById(userKey, id);
         return "";
     }
 
@@ -265,8 +292,10 @@ public class CatalogController {
     @ResponseBody
     public List<MediaItem> apiListItems(
             @RequestParam(name = "type", required = false) MediaType mediaType,
-            @RequestParam(name = "q", required = false) String query) {
-        List<MediaItem> items = mediaRepository.findByTypeAndQuery(mediaType, query);
+            @RequestParam(name = "q", required = false) String query,
+            HttpServletRequest request) {
+        String userKey = userIdentityResolver.resolveUserKey(request);
+        List<MediaItem> items = mediaRepository.findByTypeAndQuery(userKey, mediaType, query);
         enrichCoverUrls(items);
         return items;
     }

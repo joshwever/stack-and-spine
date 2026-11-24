@@ -73,10 +73,10 @@ public class CoverStorageService {
     }
 
     /**
-     * Uploads an image file to the private GCS bucket under `covers/<itemId>-<uuid>.<ext>`
+     * Uploads an image file to the private GCS bucket under `covers/<encodedUser>/<itemId>-<uuid>.<ext>`
      * and returns the GCS object path to store in Firestore.
      */
-    public String uploadCover(String itemId, MultipartFile file) throws IOException {
+    public String uploadCover(String userKey, String itemId, MultipartFile file) throws IOException {
         if (!gcsEnabled) {
             throw new IllegalStateException("GCS cover uploads require stackandspine.storage=firestore and a configured media bucket.");
         }
@@ -98,8 +98,9 @@ public class CoverStorageService {
             default -> ".jpg";
         };
 
+        String encodedUser = UserIdentityResolver.encodeGcsPathSegment(userKey);
         String safeItemId = itemId.replaceAll("[^a-zA-Z0-9_-]", "_");
-        String objectPath = "covers/" + safeItemId + "-" + UUID.randomUUID().toString().substring(0, 8) + extension;
+        String objectPath = "covers/" + encodedUser + "/" + safeItemId + "-" + UUID.randomUUID().toString().substring(0, 8) + extension;
 
         BlobId blobId = BlobId.of(bucketName, objectPath);
         BlobInfo blobInfo = BlobInfo.newBuilder(blobId)
@@ -113,10 +114,10 @@ public class CoverStorageService {
     }
 
     /**
-     * Uploads a cover/spine photo to the `inbox/` prefix in the private GCS bucket,
-     * triggering the Eventarc -> Vertex AI Gemini asynchronous enrichment pipeline.
+     * Uploads a cover/spine photo to `inbox/<encodedUser>/<uuid>.<ext>` in the private GCS bucket,
+     * triggering the Eventarc -> Vertex AI Gemini asynchronous enrichment pipeline for that user.
      */
-    public String uploadInboxPhoto(MultipartFile file) throws IOException {
+    public String uploadInboxPhoto(String userKey, MultipartFile file) throws IOException {
         if (!gcsEnabled) {
             throw new IllegalStateException("AI Photo Scan requires stackandspine.storage=firestore and a configured media bucket.");
         }
@@ -138,7 +139,8 @@ public class CoverStorageService {
             default -> ".jpg";
         };
 
-        String objectPath = "inbox/" + UUID.randomUUID() + extension;
+        String encodedUser = UserIdentityResolver.encodeGcsPathSegment(userKey);
+        String objectPath = "inbox/" + encodedUser + "/" + UUID.randomUUID() + extension;
         BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectPath))
                 .setContentType(contentType)
                 .setCacheControl("private, max-age=3600")
@@ -151,9 +153,10 @@ public class CoverStorageService {
 
     /**
      * Downloads an inbox photo from GCS, crops it to the Gemini-detected normalized [0..1000]
-     * bounding box [ymin, xmin, ymax, xmax], and saves the clean cropped JPEG under `covers/`.
+     * bounding box [ymin, xmin, ymax, xmax], and saves the clean cropped JPEG under `covers/<encodedUser>/`.
      */
     public Optional<String> cropAndSaveCover(
+            String userKey,
             String sourceBucket,
             String sourceObjectPath,
             String itemId,
@@ -201,8 +204,9 @@ public class CoverStorageService {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             ImageIO.write(rgb, "jpg", out);
 
+            String encodedUser = UserIdentityResolver.encodeGcsPathSegment(userKey);
             String safeItemId = itemId.replaceAll("[^a-zA-Z0-9_-]", "_");
-            String destPath = "covers/" + safeItemId + "-cropped.jpg";
+            String destPath = "covers/" + encodedUser + "/" + safeItemId + "-cropped.jpg";
             BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, destPath))
                     .setContentType("image/jpeg")
                     .setCacheControl("private, max-age=3600")
@@ -343,9 +347,9 @@ public class CoverStorageService {
 
     /**
      * Downloads a book's cover image from OpenLibrary Covers API and archives it into
-     * the private GCS bucket under `covers/<itemId>-<uuid>.jpg`.
+     * the private GCS bucket under `covers/<encodedUser>/<itemId>-<uuid>.jpg`.
      */
-    public Optional<String> fetchAndUploadOpenLibraryCover(String itemId, String rawIsbn) {
+    public Optional<String> fetchAndUploadOpenLibraryCover(String userKey, String itemId, String rawIsbn) {
         if (!gcsEnabled) {
             return Optional.empty();
         }
@@ -383,8 +387,9 @@ public class CoverStorageService {
                 default -> ".jpg";
             };
 
+            String encodedUser = UserIdentityResolver.encodeGcsPathSegment(userKey);
             String safeItemId = itemId.replaceAll("[^a-zA-Z0-9_-]", "_");
-            String objectPath = "covers/" + safeItemId + "-" + UUID.randomUUID().toString().substring(0, 8) + extension;
+            String objectPath = "covers/" + encodedUser + "/" + safeItemId + "-" + UUID.randomUUID().toString().substring(0, 8) + extension;
 
             BlobInfo blobInfo = BlobInfo.newBuilder(BlobId.of(bucketName, objectPath))
                     .setContentType(contentType)

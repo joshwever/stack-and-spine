@@ -1,13 +1,17 @@
 package com.stackandspine;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.stackandspine.service.UserIdentityResolver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -71,5 +75,61 @@ class StackAndSpineApplicationTests {
                 .andExpect(content().string(containsString("The Last Duel (Edited)")))
                 .andExpect(content().string(containsString("E-Book")))
                 .andExpect(content().string(containsString("hx-swap-oob=\"true\"")));
+    }
+
+    @Test
+    void multiUserCatalogsAreStrictlyIsolatedByIapHeader() throws Exception {
+        String aliceHeader = "accounts.google.com:Alice.Reader@example.com";
+
+        // Alice starts with a completely empty personal library
+        mockMvc.perform(get("/api/items")
+                        .header(UserIdentityResolver.IAP_EMAIL_HEADER, aliceHeader))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(get("/")
+                        .header(UserIdentityResolver.IAP_EMAIL_HEADER, aliceHeader))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("alice.reader@example.com")));
+
+        // Alice adds an item to her personal library
+        mockMvc.perform(post("/items")
+                        .header(UserIdentityResolver.IAP_EMAIL_HEADER, aliceHeader)
+                        .param("mediaType", "BLU_RAY")
+                        .param("title", "Blade Runner 2049")
+                        .param("creator", "Denis Villeneuve")
+                        .param("releaseYear", "2017"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/"));
+
+        // Alice sees her 1 item
+        mockMvc.perform(get("/api/items")
+                        .header(UserIdentityResolver.IAP_EMAIL_HEADER, aliceHeader))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].title").value("Blade Runner 2049"));
+
+        // Default user (joshwever@gmail.com) does NOT see Alice's item, and Alice cannot delete Josh's items
+        mockMvc.perform(get("/api/items").param("q", "Blade Runner 2049"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mockMvc.perform(delete("/items/lt-230813791")
+                        .header(UserIdentityResolver.IAP_EMAIL_HEADER, aliceHeader))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/items/lt-230813791/card"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("item-card-lt-230813791")));
+    }
+
+    @Test
+    void userIdentityResolverEncodesAndDecodesGcsSegmentsLosslessly() {
+        String normalized = UserIdentityResolver.normalizeUserKey("accounts.google.com:JoshWever@Gmail.com");
+        assertThat(normalized).isEqualTo("joshwever@gmail.com");
+
+        String segment = UserIdentityResolver.encodeGcsPathSegment(normalized);
+        assertThat(segment).doesNotContain("/").doesNotContain("=");
+        assertThat(UserIdentityResolver.decodeGcsPathSegment(segment)).isEqualTo("joshwever@gmail.com");
     }
 }

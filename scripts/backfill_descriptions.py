@@ -21,7 +21,8 @@ import urllib.parse
 import urllib.request
 
 PROJECT_ID = "project-f2e57f3d-860e-486f-a44"
-COLLECTION = "media_items"
+DEFAULT_USER = "joshwever@gmail.com"
+COLLECTION = f"users/{DEFAULT_USER}/media_items"
 USER_AGENT = "StackAndSpine/1.0 (https://stack-and-spine-212550439760.us-central1.run.app)"
 MAX_WORKERS = 10
 BATCH_SIZE = 50

@@ -72,7 +72,7 @@ public class VertexAiEnrichmentService {
         this.modelName = modelName;
     }
 
-    public MediaItem extractMediaItem(String bucket, String objectName, String mimeType) throws IOException {
+    public MediaItem extractMediaItem(String userKey, String bucket, String objectName, String mimeType) throws IOException {
         String gcsUri = "gs://" + bucket + "/" + objectName;
         String safeMimeType = (mimeType != null && mimeType.startsWith("image/")) ? mimeType : "image/jpeg";
 
@@ -96,7 +96,7 @@ public class VertexAiEnrichmentService {
                         "temperature", 0.1));
 
         String bearerToken = getAccessToken();
-        log.info("Calling Vertex AI Gemini ({}) on {}", modelName, gcsUri);
+        log.info("Calling Vertex AI Gemini ({}) on {} for user '{}'", modelName, gcsUri, userKey);
 
         String responseJson = restClient.post()
                 .uri(endpoint)
@@ -123,10 +123,10 @@ public class VertexAiEnrichmentService {
                 .trim();
 
         JsonNode extracted = objectMapper.readTree(cleanedJson);
-        return buildMediaItem(bucket, objectName, extracted);
+        return buildMediaItem(userKey, bucket, objectName, extracted);
     }
 
-    private MediaItem buildMediaItem(String bucket, String objectName, JsonNode extracted) {
+    private MediaItem buildMediaItem(String userKey, String bucket, String objectName, JsonNode extracted) {
         String id = "ai-" + shortHash(objectName);
         String title = textOrDefault(extracted, "title", "Unidentified Media Item");
         String creator = textOrDefault(extracted, "creator", "Unknown Creator");
@@ -175,7 +175,7 @@ public class VertexAiEnrichmentService {
             int ymax = box.get(2).asInt();
             int xmax = box.get(3).asInt();
             if (ymin >= 0 && xmin >= 0 && ymax <= 1000 && xmax <= 1000 && ymax > ymin && xmax > xmin) {
-                coverStorageService.cropAndSaveCover(bucket, objectName, id, ymin, xmin, ymax, xmax)
+                coverStorageService.cropAndSaveCover(userKey, bucket, objectName, id, ymin, xmin, ymax, xmax)
                         .ifPresent(item::setCoverObjectPath);
             }
         }
