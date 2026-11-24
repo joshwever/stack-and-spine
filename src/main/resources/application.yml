@@ -31,6 +31,9 @@ stackandspine:
       enabled: ${STACKANDSPINE_IDENTITY_ENABLED:true}
       api-key: ${STACKANDSPINE_IDENTITY_API_KEY:AIzaSyAMQtsseDWrrnggORgDMUmPhWko65DOI4Q}
       auth-domain: ${STACKANDSPINE_IDENTITY_AUTH_DOMAIN:project-f2e57f3d-860e-486f-a44.firebaseapp.com}
+  quota:
+    ai-scan-daily-limit: ${STACKANDSPINE_AI_SCAN_DAILY_LIMIT:15}
+    admin-users: ${STACKANDSPINE_ADMIN_USERS:joshwever@gmail.com}
   gcp:
     project-id: ${GOOGLE_CLOUD_PROJECT:project-f2e57f3d-860e-486f-a44}
     database-id: ${STACKANDSPINE_FIRESTORE_DATABASE:(default)}

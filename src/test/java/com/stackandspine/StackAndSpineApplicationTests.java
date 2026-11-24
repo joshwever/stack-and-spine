@@ -5,17 +5,20 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.stackandspine.service.AiScanQuotaService;
 import com.stackandspine.service.UserIdentityResolver;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "stackandspine.storage=memory")
@@ -24,6 +27,9 @@ class StackAndSpineApplicationTests {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private AiScanQuotaService aiScanQuotaService;
 
     @Test
     void contextLoadsAndReturnsSeededLibraryThingCatalog() throws Exception {
@@ -131,5 +137,36 @@ class StackAndSpineApplicationTests {
         String segment = UserIdentityResolver.encodeGcsPathSegment(normalized);
         assertThat(segment).doesNotContain("/").doesNotContain("=");
         assertThat(UserIdentityResolver.decodeGcsPathSegment(segment)).isEqualTo("joshwever@gmail.com");
+    }
+
+    @Test
+    void aiScanQuotaCapsRegularUsersAt15AndExemptsAdmin() throws Exception {
+        String regularUser = "quota-tester@example.com";
+        String adminUser = "joshwever@gmail.com";
+
+        assertThat(aiScanQuotaService.isAdmin(adminUser)).isTrue();
+        assertThat(aiScanQuotaService.isAdmin(regularUser)).isFalse();
+        assertThat(aiScanQuotaService.getStatus(adminUser).unlimited()).isTrue();
+
+        // Admin can exceed 15 scans with no cap
+        for (int i = 0; i < 25; i++) {
+            assertThat(aiScanQuotaService.tryConsume(adminUser)).isTrue();
+        }
+
+        // Regular user is capped at exactly 15 scans
+        for (int i = 0; i < 15; i++) {
+            assertThat(aiScanQuotaService.tryConsume(regularUser)).isTrue();
+        }
+        assertThat(aiScanQuotaService.tryConsume(regularUser)).isFalse();
+        assertThat(aiScanQuotaService.getStatus(regularUser).remaining()).isZero();
+
+        // 16th upload via /inbox/scan redirects to /?quotaExceeded=true before touching GCS
+        MockMultipartFile dummyPhoto = new MockMultipartFile(
+                "file", "cover.jpg", "image/jpeg", new byte[] {1, 2, 3});
+        mockMvc.perform(multipart("/inbox/scan")
+                        .file(dummyPhoto)
+                        .header(UserIdentityResolver.IAP_EMAIL_HEADER, "accounts.google.com:" + regularUser))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/?quotaExceeded=true"));
     }
 }

@@ -24,6 +24,19 @@
         </div>
     </div>
 
+    <div th:if="${quotaExceeded}"
+         class="max-w-6xl mx-auto px-6 pt-4">
+        <div class="rounded-xl bg-amber-950/70 border border-amber-700/60 px-4 py-3 text-xs text-amber-200 flex items-center justify-between gap-3">
+            <span>
+                <strong>Daily AI Scan limit reached (<span th:text="${aiScanDailyLimit}">15</span>/<span th:text="${aiScanDailyLimit}">15</span>).</strong>
+                Your daily AI Scan quota resets at midnight UTC. You can still add items manually or via ISBN/Title auto-fill anytime.
+            </span>
+            <a href="/" class="shrink-0 px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-500 text-white font-medium">
+                Dismiss
+            </a>
+        </div>
+    </div>
+
     <main id="main-layout"
           data-expanded="false"
           class="group/layout max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-[auto_1fr] gap-6 items-start">

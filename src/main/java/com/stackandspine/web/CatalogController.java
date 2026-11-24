@@ -3,6 +3,7 @@ package com.stackandspine.web;
 import com.stackandspine.model.MediaItem;
 import com.stackandspine.model.MediaType;
 import com.stackandspine.repository.MediaRepository;
+import com.stackandspine.service.AiScanQuotaService;
 import com.stackandspine.service.CoverStorageService;
 import com.stackandspine.service.MetadataLookupService;
 import com.stackandspine.service.UserIdentityResolver;
@@ -34,16 +35,19 @@ public class CatalogController {
     private final CoverStorageService coverStorageService;
     private final MetadataLookupService metadataLookupService;
     private final UserIdentityResolver userIdentityResolver;
+    private final AiScanQuotaService aiScanQuotaService;
 
     public CatalogController(
             MediaRepository mediaRepository,
             CoverStorageService coverStorageService,
             MetadataLookupService metadataLookupService,
-            UserIdentityResolver userIdentityResolver) {
+            UserIdentityResolver userIdentityResolver,
+            AiScanQuotaService aiScanQuotaService) {
         this.mediaRepository = mediaRepository;
         this.coverStorageService = coverStorageService;
         this.metadataLookupService = metadataLookupService;
         this.userIdentityResolver = userIdentityResolver;
+        this.aiScanQuotaService = aiScanQuotaService;
     }
 
     @GetMapping("/")
@@ -52,6 +56,7 @@ public class CatalogController {
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "scanned", required = false) Boolean scanned,
+            @RequestParam(name = "quotaExceeded", required = false) Boolean quotaExceeded,
             @RequestHeader(name = "HX-Request", required = false) String hxRequest,
             HttpServletRequest request,
             Model model) {
@@ -82,6 +87,11 @@ public class CatalogController {
         model.addAttribute("selectedType", mediaType);
         model.addAttribute("query", query == null ? "" : query);
         model.addAttribute("scanned", Boolean.TRUE.equals(scanned));
+        model.addAttribute("quotaExceeded", Boolean.TRUE.equals(quotaExceeded));
+        model.addAttribute("aiScanDailyLimit", aiScanQuotaService.getDailyLimit());
+        if (!"true".equalsIgnoreCase(hxRequest)) {
+            model.addAttribute("aiScanQuota", aiScanQuotaService.getStatus(userKey));
+        }
         model.addAttribute("mediaTypes", MediaType.values());
         model.addAttribute("storageBackend", mediaRepository.storageBackendName());
         model.addAttribute("authenticatedUser", authenticatedUser);
@@ -164,6 +174,9 @@ public class CatalogController {
             @RequestParam("file") MultipartFile file,
             HttpServletRequest request) throws IOException {
         String userKey = userIdentityResolver.resolveUserKey(request);
+        if (!aiScanQuotaService.tryConsume(userKey)) {
+            return "redirect:/?quotaExceeded=true";
+        }
         coverStorageService.uploadInboxPhoto(userKey, file);
         return "redirect:/?scanned=true";
     }
